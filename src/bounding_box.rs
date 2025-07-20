@@ -3,7 +3,7 @@ use std::{io::{self, Write}, mem, ops::RangeInclusive};
 
 use geo_types::Point;
 
-use crate::{Coord, Coords};
+use crate::{Coord, Coords, Relation, RelationBetweenShapes};
 
 /// Bounding box of a Zerometry.
 ///
@@ -124,6 +124,34 @@ impl fmt::Debug for BoundingBox {
     }
 }
 
+impl RelationBetweenShapes<Coord> for BoundingBox {
+    fn relation(&self, other: &Coord) -> Relation {
+        if self.contains_coord(other) {
+            Relation::Contains
+        } else {
+            Relation::Disjoint
+        }
+    }
+}
+
+impl RelationBetweenShapes<BoundingBox> for BoundingBox {
+    fn relation(&self, other: &BoundingBox) -> Relation {
+        let contains_bottom_left = self.contains_coord(other.bottom_left());
+        let contains_top_right = self.contains_coord(other.top_right());
+        let contained_bottom_left = other.contains_coord(self.bottom_left());
+        let contained_top_right = other.contains_coord(self.top_right());
+        if contains_bottom_left && contains_top_right {
+            Relation::Contains
+        } else if contained_bottom_left && contained_top_right {
+            Relation::Contained
+        } else if contained_bottom_left || contained_top_right || contains_bottom_left || contains_top_right {
+            Relation::Intersects
+        } else {
+            Relation::Disjoint
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use bytemuck::cast_slice;
@@ -221,5 +249,26 @@ mod tests {
         let bb = BoundingBox::from_slice(&[1.0, 2.0, 3.0, 4.0]);
         assert!(bb.contains_coord(&Coord::from_slice(&[2.0, 3.0])));
         assert!(!bb.contains_coord(&Coord::from_slice(&[0.0, 0.0])));
+    }
+
+    #[test]
+    fn test_bounding_box_relation_to_coord() {
+        let bb = BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0]);
+        assert_eq!(bb.relation(Coord::from_slice(&[2.0, 3.0])), Relation::Contains);
+        assert_eq!(bb.relation(Coord::from_slice(&[0.0, 0.0])), Relation::Contains);
+        assert_eq!(bb.relation(Coord::from_slice(&[10.0, 10.0])), Relation::Contains);
+        assert_eq!(bb.relation(Coord::from_slice(&[11.0, 11.0])), Relation::Disjoint);
+        assert_eq!(bb.relation(Coord::from_slice(&[-1.0, -1.0])), Relation::Disjoint);
+    }
+
+    #[test]
+    fn test_bounding_box_relation_to_bounding_box() {
+        let bb = BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0]);
+        assert_eq!(bb.relation(BoundingBox::from_slice(&[1.0, 1.0, 3.0, 3.0])), Relation::Contains);
+        assert_eq!(bb.relation(BoundingBox::from_slice(&[0.0, 0.0, 1.0, 2.0])), Relation::Intersects);
+        assert_eq!(bb.relation(BoundingBox::from_slice(&[0.0, 0.0, 5.0, 6.0])), Relation::Intersects);
+        assert_eq!(bb.relation(BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0])), Relation::Contains);
+        assert_eq!(bb.relation(BoundingBox::from_slice(&[-1.0, -1.0, 11.0, 11.0])), Relation::Contained);
+        assert_eq!(bb.relation(BoundingBox::from_slice(&[11.0, 11.0, 12.0, 12.0])), Relation::Disjoint);
     }
 }

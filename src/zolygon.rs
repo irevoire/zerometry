@@ -3,7 +3,7 @@ use std::io::{Write, self};
 
 use geo_types::Polygon;
 
-use crate::{BoundingBox, Coord, Coords, Relation, RelationBetweenShapes, Segment, Zoint, COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS};
+use crate::{BoundingBox, Coord, Coords, Relation, RelationBetweenShapes, Segment, Zoint, ZultiPoints, COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS};
 
 /// A polygon is a closed shape defined by a list of coordinates.
 ///
@@ -65,17 +65,17 @@ impl<'a> fmt::Debug for Zolygon<'a> {
     }
 }
 
-impl<'a> RelationBetweenShapes<Zoint<'a>> for Zolygon<'a> {
-    fn relation(&self, other: &Zoint<'a>) -> Relation {
+impl<'a> RelationBetweenShapes<Coord> for Zolygon<'a> {
+    fn relation(&self, other: &Coord) -> Relation {
         // If the point is outside of the bounding box, we can early return it's definitely not IN the polygon
-        if !self.bounding_box.contains_coord(other.coord()) {
+        if !self.bounding_box.contains_coord(other) {
             return Relation::Disjoint;
         }
 
         // To find if a point is in a polygon we draw a ray from outside of the polygon to the point
         // and count the number of times the ray intersects with the polygon. In it's even it means
         // the point is outside of the polygon, otherwise it's inside.
-        let end = other.coord();
+        let end = other;
         let mut buffer = [0.0; COORD_SIZE_IN_FLOATS];
         let start = Coord::from_slice_mut(&mut buffer);
         *start.lng_mut() = self.bounding_box.left();
@@ -95,6 +95,29 @@ impl<'a> RelationBetweenShapes<Zoint<'a>> for Zolygon<'a> {
         } else {
             Relation::Contains
         }
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zoint<'a>> for Zolygon<'a> {
+    fn relation(&self, other: &Zoint<'a>) -> Relation {
+        self.relation(other.coord())
+    }
+}
+
+// We don't need to know if everything is contained, only one point is enough for us.
+impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zolygon<'a> {
+    fn relation(&self, other: &ZultiPoints<'a>) -> Relation {
+        // If the bounding boxes are disjoint, the relation must be disjoint, we can early return.
+        if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
+            return Relation::Disjoint;
+        }
+
+        for coord in other.coords().iter() {
+            if self.relation(coord) == Relation::Contains {
+                return Relation::Contains;
+            }
+        }
+        Relation::Disjoint
     }
 }
 

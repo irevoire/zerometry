@@ -25,6 +25,7 @@ pub enum Zerometry<'a> {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Relation {
     Contains,
+    Contained,
     Intersects,
     Disjoint,
 }

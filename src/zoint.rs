@@ -3,7 +3,7 @@ use std::io::{self, Write};
 
 use geo_types::Point;
 
-use crate::{Coord, Relation, RelationBetweenShapes, ZultiPoints};
+use crate::{Coord, Relation, RelationBetweenShapes, Zolygon, ZultiPoints};
 
 
 #[derive(Clone, Copy)]
@@ -62,6 +62,16 @@ impl<'a> RelationBetweenShapes<Zoint<'a>> for Zoint<'a> {
 impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zoint<'a> {
     fn relation(&self, _other: &ZultiPoints<'a>) -> Relation {
         Relation::Disjoint
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zoint<'a> {
+    fn relation(&self, other: &Zolygon<'a>) -> Relation {
+        if other.relation(self) == Relation::Contains {
+            Relation::Contained
+        } else {
+            Relation::Disjoint
+        }
     }
 }
 

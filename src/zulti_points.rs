@@ -3,7 +3,7 @@ use std::io::{self, Write};
 
 use geo_types::MultiPoint;
 
-use crate::{BoundingBox, Coords, Relation, RelationBetweenShapes, Zoint, COORD_SIZE_IN_BYTES};
+use crate::{BoundingBox, Coords, Relation, RelationBetweenShapes, Zoint, Zolygon, COORD_SIZE_IN_BYTES};
 
 
 #[derive(Clone, Copy)]
@@ -71,6 +71,19 @@ impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for ZultiPoints<'a> {
 impl<'a> RelationBetweenShapes<Zoint<'a>> for ZultiPoints<'a> {
     fn relation(&self, _other: &Zoint<'a>) -> Relation {
         Relation::Disjoint
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiPoints<'a> {
+    fn relation(&self, other: &Zolygon<'a>) -> Relation {
+        match other.relation(self) {
+            Relation::Contains => {
+                debug_assert!(true, "A point cannot contain a polygon");
+                Relation::Contained
+            }
+            Relation::Contained => Relation::Contains,
+            r => r,
+        }
     }
 }
 
