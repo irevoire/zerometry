@@ -22,6 +22,7 @@ pub enum Zerometry<'a> {
     Polygon(Zolygon<'a>),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Relation {
     Contains,
     Intersects,

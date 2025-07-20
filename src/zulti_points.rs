@@ -99,7 +99,7 @@ mod tests {
         assert_compact_debug_snapshot!(zulti_points.coords(), @"[Coord { x: 1.0, y: 2.0 }, Coord { x: 3.0, y: 4.0 }]");
     }
 
-    // Prop test ensuring we can round trip from a point to a zoint and back to a point
+    // Prop test ensuring we can round trip from a multi-point to a zulti-points and back to a multi-point
     proptest::proptest! {
         #[test]
         fn test_zulti_points_round_trip(points: Vec<(f64, f64)>) {

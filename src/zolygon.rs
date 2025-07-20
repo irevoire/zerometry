@@ -93,15 +93,24 @@ impl<'a> RelationBetweenShapes<Zoint<'a>> for Zolygon<'a> {
         if intersections % 2 == 0 {
             Relation::Disjoint
         } else {
-            Relation::Intersects
+            Relation::Contains
         }
+    }
+}
+
+impl<'a> PartialEq<Polygon<f64>> for Zolygon<'a> {
+    fn eq(&self, other: &Polygon<f64>) -> bool {
+        if !other.interiors().is_empty() {
+            return false;
+        }
+        self.coords.iter().zip(other.exterior().points()).all(|(a, b)| a.lng() == b.x() && a.lat() == b.y())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use bytemuck::cast_slice;
-    use geo_types::LineString;
+    use geo_types::{LineString, Point};
     use insta::assert_debug_snapshot;
 
     use super::*;
@@ -206,19 +215,37 @@ mod tests {
         insta::assert_debug_snapshot!(zolygon.coords(), @"[]");
     }
 
-    /*
     #[test]
     fn test_zolygon_relation_to_zoint() {
         // 2 coordinates for the bounding box and 3 coordinates for the polygon
         let mut buffer = Vec::new();
-        let polygon = Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
+        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
             geo_types::Coord {x: 0.0, y: 0.0},
             geo_types::Coord {x: 10.0, y: 0.0},
             geo_types::Coord {x: 10.0, y: 10.0},
             geo_types::Coord {x: 0.0, y: 10.0},
         ]), Vec::new())).unwrap();
-        let point = Zoint::new(&Coord::new(5.0, 5.0));
-        assert_eq!(polygon.relation(&point), Relation::Intersects);
+        let zoint_inside_bytes = buffer.len();
+        Zoint::write_from_geometry(&mut buffer, &Point::new(5.0, 5.0)).unwrap();
+        let zoint_outside_bytes = buffer.len();
+        Zoint::write_from_geometry(&mut buffer, &Point::new(15.0, 15.0)).unwrap();
+
+        let zolygon = Zolygon::from_bytes(&buffer[..zoint_inside_bytes]);
+        let point_inside = Zoint::from_bytes(&buffer[zoint_inside_bytes..zoint_outside_bytes]);
+        let point_outside = Zoint::from_bytes(&buffer[zoint_outside_bytes..]);
+        assert_eq!(zolygon.relation(&point_inside), Relation::Contains);
+        assert_eq!(zolygon.relation(&point_outside), Relation::Disjoint);
     }
-    */
+
+    // Prop test ensuring we can round trip from a polygon to a zolygon and back to a polygon
+    proptest::proptest! {
+        #[test]
+        fn test_zolygon_round_trip(points: Vec<(f64, f64)>) {
+            let polygon = Polygon::new(LineString::new(points.iter().map(|(x, y)| geo_types::Coord { x: *x, y: *y }).collect()), Vec::new());
+            let mut buffer = Vec::new();
+            Zolygon::write_from_geometry(&mut buffer, &polygon).unwrap();
+            let zolygon = Zolygon::from_bytes(&buffer);
+            assert_eq!(zolygon, polygon);
+        }
+    }
 }
