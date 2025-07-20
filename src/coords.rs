@@ -28,6 +28,11 @@ impl<'a> Coords {
         unsafe { std::mem::transmute(data) }
     }
 
+    pub fn from_slice_mut(data: &mut [f64]) -> &mut Self {
+        debug_assert!(data.len() % COORD_SIZE_IN_FLOATS == 0);
+        unsafe { std::mem::transmute(data) }
+    }
+
     pub fn len(&self) -> usize {
         self.data.len() / COORD_SIZE_IN_FLOATS
     }
@@ -40,6 +45,10 @@ impl<'a> Coords {
         self.data
             .chunks(COORD_SIZE_IN_FLOATS)
             .map(|chunk| Coord::from_slice(chunk))
+    }
+
+    pub fn consecutive_pairs(&self) -> impl Iterator<Item = &[f64]> {
+        self.data.windows(COORD_SIZE_IN_FLOATS * 2).step_by(COORD_SIZE_IN_FLOATS)
     }
 }
 

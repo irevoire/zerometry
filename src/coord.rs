@@ -28,12 +28,25 @@ impl<'a> Coord {
         unsafe { std::mem::transmute(data) }
     }
 
+    pub fn from_slice_mut(data: &mut [f64]) -> &mut Self {
+        debug_assert_eq!(data.len(), 2);
+        unsafe { std::mem::transmute(data) }
+    }
+
     pub fn lng(&self) -> f64 {
         self.data[0]
     }
 
+    pub fn lng_mut(&mut self) -> &mut f64 {
+        &mut self.data[0]
+    }
+
     pub fn lat(&self) -> f64 {
         self.data[1]
+    }
+
+    pub fn lat_mut(&mut self) -> &mut f64 {
+        &mut self.data[1]
     }
 
     pub fn to_geo(&self) -> geo_types::Coord<f64> {

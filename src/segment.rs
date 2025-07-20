@@ -1,5 +1,4 @@
 use core::fmt;
-use std::mem;
 
 use crate::{Coord, Coords};
 
@@ -9,35 +8,39 @@ use crate::{Coord, Coords};
 ///
 /// The coordinates are stored in a `Coords` struct, which is a slice of `f64` values.
 /// The first coordinate is the start point, and the second coordinate is the end point.
-#[repr(transparent)]
-pub struct Segment {
-    coords: Coords,
+#[derive(Clone, Copy)]
+pub struct Segment<'a> {
+    start: &'a Coord,
+    end: &'a Coord,
 }
 
-impl Segment {
-    pub fn from_bytes(data: &[u8]) -> &Self {
+impl<'a> Segment<'a> {
+    pub fn from_bytes(data: &'a [u8]) -> Self {
         Self::from_coords(Coords::from_bytes(data))
     }
 
-    pub fn from_slice(data: &[f64]) -> &Self {
+    pub fn from_slice(data: &'a [f64]) -> Self {
         Self::from_coords(Coords::from_slice(data))
     }
 
-    pub fn from_coords(coords: &Coords) -> &Self {
+    pub fn from_coords(coords: &'a Coords) -> Self {
         debug_assert_eq!(coords.len(), 2, "Segment must have 2 coordinates");
-        unsafe { mem::transmute(coords) }
+        Self {
+            start: &coords[0],
+            end: &coords[1],
+        }
     }
 
-    pub fn coords(&self) -> &Coords {
-        &self.coords
+    pub fn from_coord_pair(start: &'a Coord, end: &'a Coord) -> Self {
+        Self { start, end }
     }
 
-    pub fn start(&self) -> &Coord {
-        &self.coords[0]
+    pub fn start(&self) -> &'a Coord {
+        self.start
     }
 
-    pub fn end(&self) -> &Coord {
-        &self.coords[1]
+    pub fn end(&self) -> &'a Coord {
+        self.end
     }
 
     /// Returns true if the segment intersects with the other segment.
@@ -104,11 +107,11 @@ impl Segment {
     }
 }
 
-impl fmt::Debug for Segment {
+impl<'a> fmt::Debug for Segment<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Segment")
-            .field("start", &&self.coords[0])
-            .field("end", &&self.coords[1])
+            .field("start", &self.start)
+            .field("end", &self.end)
             .finish()
     }
 }

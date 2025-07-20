@@ -1,5 +1,7 @@
 use core::fmt;
-use std::{mem, ops::RangeInclusive};
+use std::{io::{self, Write}, mem, ops::RangeInclusive};
+
+use geo_types::Point;
 
 use crate::{Coord, Coords};
 
@@ -24,11 +26,56 @@ impl BoundingBox {
         Self::from_coords(Coords::from_slice(data))
     }
 
+    pub fn from_slice_mut(data: &mut [f64]) -> &mut Self {
+        Self::from_coords_mut(Coords::from_slice_mut(data))
+    }
+
     pub fn from_coords(coords: &Coords) -> &Self {
-        debug_assert_eq!(coords.len(), 2, "Bounding box must have 2 coordinates");
+        debug_assert_eq!(coords.len(), 2, "Bounding box must have 2 coordinates but instead got {}", coords.len());
         debug_assert!(coords[0].lng() <= coords[1].lng(), "Bounding box must have the left side before the right side");
         debug_assert!(coords[0].lat() <= coords[1].lat(), "Bounding box must have the bottom side before the top side");
         unsafe { mem::transmute(coords) }
+    }
+
+    pub fn from_coords_mut(coords: &mut Coords) -> &mut Self {
+        debug_assert_eq!(coords.len(), 2, "Bounding box must have 2 coordinates but instead got {}", coords.len());
+        debug_assert!(coords[0].lng() <= coords[1].lng(), "Bounding box must have the left side before the right side");
+        debug_assert!(coords[0].lat() <= coords[1].lat(), "Bounding box must have the bottom side before the top side");
+        unsafe { mem::transmute(coords) }
+    }
+
+
+    pub fn write_from_geometry(writer: &mut impl Write, mut points: impl Iterator<Item = Point<f64>>) -> Result<(), io::Error> {
+        // if there is no points we ends up with an empty bouding box in 0,0 and on points in the polygon
+        let first_point = points.next().unwrap_or_default();
+        let mut top = first_point.y();
+        let mut bottom = first_point.y();
+        let mut left = first_point.x();
+        let mut right = first_point.x();
+
+        for point in points {
+            if point.y() > top {
+                top = point.y();
+            }
+            if point.y() < bottom {
+                bottom = point.y();
+            }
+            if point.x() < left {
+                left = point.x();
+            }
+            if point.x() > right {
+                right = point.x();
+            }
+        }
+        
+        // 1. Write the bounding box
+        //   It's bottom left first
+        writer.write_all(&left.to_ne_bytes())?;
+        writer.write_all(&bottom.to_ne_bytes())?;
+        //   Then the top right
+        writer.write_all(&right.to_ne_bytes())?;
+        writer.write_all(&top.to_ne_bytes())?;
+        Ok(())
     }
 
     pub fn coords(&self) -> &Coords {
