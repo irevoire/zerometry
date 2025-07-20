@@ -1,0 +1,13 @@
+[package]
+name = "zerometry"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+byteorder = "1.4"
+bytemuck = "1.23.1"
+geo-types = "0.7.16"
+
+[dev-dependencies]
+insta = "1.43.1"
+proptest = "1.4"
