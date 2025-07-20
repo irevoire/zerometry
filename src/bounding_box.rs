@@ -265,8 +265,8 @@ mod tests {
     fn test_bounding_box_relation_to_bounding_box() {
         let bb = BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0]);
         assert_eq!(bb.relation(BoundingBox::from_slice(&[1.0, 1.0, 3.0, 3.0])), Relation::Contains);
-        assert_eq!(bb.relation(BoundingBox::from_slice(&[0.0, 0.0, 1.0, 2.0])), Relation::Intersects);
-        assert_eq!(bb.relation(BoundingBox::from_slice(&[0.0, 0.0, 5.0, 6.0])), Relation::Intersects);
+        assert_eq!(bb.relation(BoundingBox::from_slice(&[-1.0, 0.0, 1.0, 2.0])), Relation::Intersects);
+        assert_eq!(bb.relation(BoundingBox::from_slice(&[10.0, 0.0, 20.0, 10.0])), Relation::Intersects);
         assert_eq!(bb.relation(BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0])), Relation::Contains);
         assert_eq!(bb.relation(BoundingBox::from_slice(&[-1.0, -1.0, 11.0, 11.0])), Relation::Contained);
         assert_eq!(bb.relation(BoundingBox::from_slice(&[11.0, 11.0, 12.0, 12.0])), Relation::Disjoint);

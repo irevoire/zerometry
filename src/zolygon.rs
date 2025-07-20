@@ -54,6 +54,10 @@ impl<'a> Zolygon<'a> {
     pub fn segments(&self) -> impl Iterator<Item = Segment<'a>> {
         self.coords.consecutive_pairs().map(|chunk| Segment::from_slice(chunk))
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.coords.len() == 0
+    }
 }
 
 impl<'a> fmt::Debug for Zolygon<'a> {
@@ -67,6 +71,10 @@ impl<'a> fmt::Debug for Zolygon<'a> {
 
 impl<'a> RelationBetweenShapes<Coord> for Zolygon<'a> {
     fn relation(&self, other: &Coord) -> Relation {
+        if self.is_empty(){
+            return Relation::Disjoint;
+        }
+
         // If the point is outside of the bounding box, we can early return it's definitely not IN the polygon
         if !self.bounding_box.contains_coord(other) {
             return Relation::Disjoint;
@@ -117,6 +125,40 @@ impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zolygon<'a> {
                 return Relation::Contains;
             }
         }
+        Relation::Disjoint
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zolygon<'a> {
+    fn relation(&self, other: &Zolygon<'a>) -> Relation {
+        if self.is_empty() || other.is_empty() {
+            return Relation::Disjoint;
+        } else if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
+            return Relation::Disjoint;
+        }
+
+        // To know if two polygons intersect we check if any of the segments of the first polygon intersect with the second polygon.
+        // That's O(n^2) but if you know a better algorithm please let me know.
+        for segment in self.segments() {
+            for other_segment in other.segments() {
+                if segment.intersects(&other_segment) {
+                    return Relation::Intersects;
+                }
+            }
+        }
+
+        // If we reached this point, the polygons don't intersect. To know if one polygon
+        // is contained in the other we check any of his points is contained in the other polygon.
+        // safe to unwrap because we checked that the polygons are not empty
+        let any = self.coords().iter().next().unwrap();
+        if other.relation(any) == Relation::Contains {
+            return Relation::Contained;
+        }
+        let any = other.coords().iter().next().unwrap();
+        if self.relation(any) == Relation::Contains {
+            return Relation::Contains;
+        }
+
         Relation::Disjoint
     }
 }
@@ -258,6 +300,144 @@ mod tests {
         let point_outside = Zoint::from_bytes(&buffer[zoint_outside_bytes..]);
         assert_eq!(zolygon.relation(&point_inside), Relation::Contains);
         assert_eq!(zolygon.relation(&point_outside), Relation::Disjoint);
+    }
+
+    #[test]
+    fn test_zolygon_relation_to_zolygon_intersects_basic() {
+        let mut buffer = Vec::new();
+        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
+            geo_types::Coord {x: 0.0, y: 0.0},
+            geo_types::Coord {x: 10.0, y: 0.0},
+            geo_types::Coord {x: 10.0, y: 10.0},
+            geo_types::Coord {x: 0.0, y: 10.0},
+        ]), Vec::new())).unwrap();
+        let first = buffer.len();
+        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
+            geo_types::Coord {x: 5.0, y: 5.0},
+            geo_types::Coord {x: 15.0, y: 5.0},
+            geo_types::Coord {x: 15.0, y: 15.0},
+            geo_types::Coord {x: 5.0, y: 15.0},
+        ]), Vec::new())).unwrap();
+        let second = buffer.len();
+        let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
+        let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
+        assert_eq!(first_zolygon.relation(&second_zolygon), Relation::Intersects);
+        assert_eq!(second_zolygon.relation(&first_zolygon), Relation::Intersects);
+    }
+
+    #[test]
+    fn test_zolygon_relation_to_zolygon_intersects_diagonal() {
+        let mut buffer = Vec::new();
+        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
+            geo_types::Coord {x: 0.0, y: 0.0},
+            geo_types::Coord {x: 10.0, y: 0.0},
+            geo_types::Coord {x: 10.0, y: 10.0},
+            geo_types::Coord {x: 0.0, y: 10.0},
+        ]), Vec::new())).unwrap();
+        let first = buffer.len();
+        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
+            geo_types::Coord {x: 5.0, y: 7.0},
+            geo_types::Coord {x: 8.0, y: 10.0},
+            geo_types::Coord {x: 5.0, y: 13.0},
+            geo_types::Coord {x: 2.0, y: 10.0},
+        ]), Vec::new())).unwrap();
+        let second = buffer.len();
+        let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
+        let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
+        assert_eq!(first_zolygon.relation(&second_zolygon), Relation::Intersects);
+        assert_eq!(second_zolygon.relation(&first_zolygon), Relation::Intersects);
+    }
+
+
+    #[test]
+    fn test_zolygon_relation_to_zolygon_intersects_on_edge() {
+        let mut buffer = Vec::new();
+        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
+            geo_types::Coord {x: 0.0, y: 0.0},
+            geo_types::Coord {x: 10.0, y: 0.0},
+            geo_types::Coord {x: 10.0, y: 10.0},
+            geo_types::Coord {x: 0.0, y: 10.0},
+        ]), Vec::new())).unwrap();
+        let first = buffer.len();
+        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
+            geo_types::Coord {x: 10.0, y: 0.0},
+            geo_types::Coord {x: 15.0, y: 0.0},
+            geo_types::Coord {x: 15.0, y: 10.0},
+            geo_types::Coord {x: 10.0, y: 10.0},
+        ]), Vec::new())).unwrap();
+        let second = buffer.len();
+        let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
+        let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
+        assert_eq!(first_zolygon.relation(&second_zolygon), Relation::Intersects);
+        assert_eq!(second_zolygon.relation(&first_zolygon), Relation::Intersects);
+    }
+
+    #[test]
+    fn test_zolygon_relation_to_zolygon_contains() {
+        let mut buffer = Vec::new();
+        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
+            geo_types::Coord {x: 0.0, y: 0.0},
+            geo_types::Coord {x: 10.0, y: 0.0},
+            geo_types::Coord {x: 10.0, y: 10.0},
+            geo_types::Coord {x: 0.0, y: 10.0},
+        ]), Vec::new())).unwrap();
+        let first = buffer.len();
+        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
+            geo_types::Coord {x: 1.0, y: 1.0},
+            geo_types::Coord {x: 1.0, y: 9.0},
+            geo_types::Coord {x: 9.0, y: 9.0},
+            geo_types::Coord {x: 9.0, y: 1.0},
+        ]), Vec::new())).unwrap();
+        let second = buffer.len();
+        let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
+        let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
+        assert_eq!(first_zolygon.relation(&second_zolygon), Relation::Contains);
+        assert_eq!(second_zolygon.relation(&first_zolygon), Relation::Contained);
+    }
+
+    // In this test the bounding boxes are disjoint and we can early exit.
+    #[test]
+    fn test_zolygon_relation_to_zolygon_disjoint_basic() {
+        let mut buffer = Vec::new();
+        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
+            geo_types::Coord {x: 0.0, y: 0.0},
+            geo_types::Coord {x: 10.0, y: 0.0},
+            geo_types::Coord {x: 10.0, y: 10.0},
+            geo_types::Coord {x: 0.0, y: 10.0},
+        ]), Vec::new())).unwrap();
+        let first = buffer.len();
+        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
+            geo_types::Coord {x: 15.0, y: 15.0},
+            geo_types::Coord {x: 15.0, y: 25.0},
+            geo_types::Coord {x: 25.0, y: 25.0},
+            geo_types::Coord {x: 25.0, y: 15.0},
+        ]), Vec::new())).unwrap();
+        let second = buffer.len();
+        let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
+        let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
+        assert_eq!(first_zolygon.relation(&second_zolygon), Relation::Disjoint);
+        assert_eq!(second_zolygon.relation(&first_zolygon), Relation::Disjoint);
+    }
+
+    #[test]
+    fn test_zolygon_relation_to_zolygon_disjoint_near() {
+        let mut buffer = Vec::new();
+        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
+            geo_types::Coord {x: 0.0, y: 0.0},
+            geo_types::Coord {x: 10.0, y: 0.0},
+            geo_types::Coord {x: 10.0, y: 10.0},
+        ]), Vec::new())).unwrap();
+        let first = buffer.len();
+        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
+            geo_types::Coord {x: 0.0, y: 1.0},
+            geo_types::Coord {x: 10.0, y: 11.0},
+            geo_types::Coord {x: 0.0, y: 11.0},
+        ]), Vec::new())).unwrap();
+        let second = buffer.len();
+        let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
+        let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
+        assert_eq!(first_zolygon.relation(&second_zolygon), Relation::Disjoint);
+        assert_eq!(second_zolygon.relation(&first_zolygon), Relation::Disjoint);
     }
 
     // Prop test ensuring we can round trip from a polygon to a zolygon and back to a polygon
