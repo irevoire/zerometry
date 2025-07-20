@@ -28,18 +28,18 @@ impl<'a> Coord {
         unsafe { std::mem::transmute(data) }
     }
 
-    pub fn x(&self) -> f64 {
+    pub fn lng(&self) -> f64 {
         self.data[0]
     }
 
-    pub fn y(&self) -> f64 {
+    pub fn lat(&self) -> f64 {
         self.data[1]
     }
 
     pub fn to_geo(&self) -> geo_types::Coord<f64> {
         geo_types::Coord {
-            x: self.x(),
-            y: self.y(),
+            x: self.lng(),
+            y: self.lat(),
         }
     }
 }
@@ -47,8 +47,8 @@ impl<'a> Coord {
 impl fmt::Debug for Coord {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Coord")
-            .field("x", &self.x())
-            .field("y", &self.y())
+            .field("x", &self.lng())
+            .field("y", &self.lat())
             .finish()
     }
 }
@@ -63,8 +63,8 @@ mod tests {
     fn test_basic_create_coord_from_bytes() {
         let data = [1.0, 2.0];
         let coord = Coord::from_bytes(cast_slice(&data));
-        assert_eq!(coord.x(), 1.0);
-        assert_eq!(coord.y(), 2.0);
+        assert_eq!(coord.lng(), 1.0);
+        assert_eq!(coord.lat(), 2.0);
     }
 
     #[test]
@@ -102,10 +102,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn debug_impl_support_precision_settings() {
         let data = [1.123456789, 2.987654321];
         let coord = Coord::from_bytes(cast_slice(&data));
-        insta::assert_snapshot!(format!("{:.2?}", coord), @"Coord { x: 1.0, y: 2.0 }");
+        insta::assert_snapshot!(format!("{:.2?}", coord), @"Coord { x: 1.12, y: 2.99 }");
     }
 }

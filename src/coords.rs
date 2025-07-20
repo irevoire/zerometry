@@ -73,13 +73,13 @@ mod tests {
         // len works
         assert_eq!(coords.len(), 2);
         // index works
-        assert_eq!(coords[0].x(), 1.0);
-        assert_eq!(coords[0].y(), 2.0);
-        assert_eq!(coords[1].x(), 3.0);
-        assert_eq!(coords[1].y(), 4.0);
+        assert_eq!(coords[0].lng(), 1.0);
+        assert_eq!(coords[0].lat(), 2.0);
+        assert_eq!(coords[1].lng(), 3.0);
+        assert_eq!(coords[1].lat(), 4.0);
         // iter works
         assert_eq!(
-            coords.iter().map(|c| (c.x(), c.y())).collect::<Vec<_>>(),
+            coords.iter().map(|c| (c.lng(), c.lat())).collect::<Vec<_>>(),
             vec![(1.0, 2.0), (3.0, 4.0)]
         );
         // Debug+iter works
@@ -116,13 +116,13 @@ mod tests {
         // len works
         assert_eq!(coords.len(), 2);
         // index works
-        assert_eq!(coords[0].x(), 1.0);
-        assert_eq!(coords[0].y(), 2.0);
-        assert_eq!(coords[1].x(), 3.0);
-        assert_eq!(coords[1].y(), 4.0);
+        assert_eq!(coords[0].lng(), 1.0);
+        assert_eq!(coords[0].lat(), 2.0);
+        assert_eq!(coords[1].lng(), 3.0);
+        assert_eq!(coords[1].lat(), 4.0);
         // iter works
         assert_eq!(
-            coords.iter().map(|c| (c.x(), c.y())).collect::<Vec<_>>(),
+            coords.iter().map(|c| (c.lng(), c.lat())).collect::<Vec<_>>(),
             vec![(1.0, 2.0), (3.0, 4.0)]
         );
         // Debug+iter works

@@ -29,15 +29,15 @@ impl<'a> Zoint<'a> {
     }
 
     pub fn to_geo(&self) -> geo_types::Point<f64> {
-        geo_types::Point::new(self.coord.x(), self.coord.y())
+        geo_types::Point::new(self.coord.lng(), self.coord.lat())
     }
 }
 
 impl<'a> fmt::Debug for Zoint<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Zoint")
-            .field("x", &self.coord.x())
-            .field("y", &self.coord.y())
+            .field("x", &self.coord.lng())
+            .field("y", &self.coord.lat())
             .finish()
     }
 }
