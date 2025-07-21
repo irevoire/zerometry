@@ -4,8 +4,7 @@ use std::io::{self, Write};
 use geo_types::Polygon;
 
 use crate::{
-    BoundingBox, Coord, Coords, Relation, RelationBetweenShapes, Segment, Zoint, ZultiPoints,
-    COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS,
+    BoundingBox, Coord, Coords, Relation, RelationBetweenShapes, Segment, Zoint, ZultiPoints, ZultiPolygon, COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS
 };
 
 /// A polygon is a closed shape defined by a list of coordinates.
@@ -182,6 +181,16 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zolygon<'a> {
         }
 
         Relation::Disjoint
+    }
+}
+
+impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for Zolygon<'a> {
+    fn relation(&self, other: &ZultiPolygon<'a>) -> Relation {
+        match other.relation(self) {
+            Relation::Contains => Relation::Contains,
+            Relation::Contained => Relation::Contained,
+            r => r,
+        }
     }
 }
 

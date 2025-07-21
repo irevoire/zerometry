@@ -3,7 +3,7 @@ use std::io::{self, Write};
 
 use geo_types::Point;
 
-use crate::{Coord, Relation, RelationBetweenShapes, Zolygon, ZultiPoints};
+use crate::{Coord, Relation, RelationBetweenShapes, Zolygon, ZultiPoints, ZultiPolygon};
 
 #[derive(Clone, Copy)]
 pub struct Zoint<'a> {
@@ -73,6 +73,16 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zoint<'a> {
             Relation::Contained
         } else {
             Relation::Disjoint
+        }
+    }
+}
+
+impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for Zoint<'a> {
+    fn relation(&self, other: &ZultiPolygon<'a>) -> Relation {
+        match other.relation(self) {
+            Relation::Contains => Relation::Contains,
+            Relation::Contained => Relation::Contained,
+            r => r,
         }
     }
 }
