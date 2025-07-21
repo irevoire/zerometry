@@ -3,7 +3,10 @@ use std::{fmt, io, mem};
 use bytemuck::cast_slice;
 use geo_types::{MultiPolygon, Point};
 
-use crate::{bounding_box::BOUNDING_BOX_SIZE_IN_BYTES, BoundingBox, RelationBetweenShapes, Zoint, Zolygon, ZultiPoints};
+use crate::{
+    bounding_box::BOUNDING_BOX_SIZE_IN_BYTES, BoundingBox, Relation, RelationBetweenShapes,
+    Zerometry, Zoint, Zolygon, ZultiPoints,
+};
 
 #[derive(Clone, Copy)]
 pub struct ZultiPolygon<'a> {
@@ -135,59 +138,60 @@ impl<'a> fmt::Debug for ZultiPolygon<'a> {
 }
 
 impl<'a> RelationBetweenShapes<Zoint<'a>> for ZultiPolygon<'a> {
-    fn relation(&self, other: &Zoint) -> crate::Relation {
+    fn relation(&self, other: &Zoint) -> Relation {
         if self.len() == 0 {
-            return crate::Relation::Disjoint;
+            return Relation::Disjoint;
         }
         if !self.bounding_box().contains_coord(&other.coord()) {
-            return crate::Relation::Disjoint;
+            return Relation::Disjoint;
         }
         for zolygon in self.zolygons() {
             match zolygon.relation(other) {
-                crate::Relation::Contains => return crate::Relation::Contains,
+                Relation::Contains => return Relation::Contains,
                 _ => {}
             }
         }
-        crate::Relation::Disjoint
+        Relation::Disjoint
     }
 }
 
 impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for ZultiPolygon<'a> {
-    fn relation(&self, other: &ZultiPoints) -> crate::Relation {
+    fn relation(&self, other: &ZultiPoints) -> Relation {
         if self.len() == 0 || other.len() == 0 {
-            return crate::Relation::Disjoint;
+            return Relation::Disjoint;
         }
-        if self.bounding_box().relation(other.bounding_box()) == crate::Relation::Disjoint {
-            return crate::Relation::Disjoint;
+        if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
+            return Relation::Disjoint;
         }
         for zolygon in self.zolygons() {
             match zolygon.relation(other) {
-                crate::Relation::Contains => return crate::Relation::Contains,
+                Relation::Contains => return Relation::Contains,
                 _ => {}
             }
         }
-        crate::Relation::Disjoint
+        Relation::Disjoint
     }
 }
 
-
 impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiPolygon<'a> {
-    fn relation(&self, other: &Zolygon) -> crate::Relation {
+    fn relation(&self, other: &Zolygon) -> Relation {
         if self.len() == 0 || other.is_empty() {
-            return crate::Relation::Disjoint;
+            return Relation::Disjoint;
         }
-        if self.bounding_box().relation(other.bounding_box()) == crate::Relation::Disjoint {
-            return crate::Relation::Disjoint;
+        if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
+            return Relation::Disjoint;
         }
-        let mut relation = crate::Relation::Disjoint;
+        let mut relation = Relation::Disjoint;
         for zolygon in self.zolygons() {
             match zolygon.relation(other) {
                 // contains take precedence over everything else
-                crate::Relation::Contains => return crate::Relation::Contains,
+                Relation::Contains => return Relation::Contains,
                 // Inretsects take precedence over contained
-                crate::Relation::Contained if relation != crate::Relation::Intersects => relation = crate::Relation::Contained,
-                crate::Relation::Intersects => relation = crate::Relation::Intersects,
-                crate::Relation::Disjoint | crate::Relation::Contained => {}
+                Relation::Contained if relation != Relation::Intersects => {
+                    relation = Relation::Contained
+                }
+                Relation::Intersects => relation = Relation::Intersects,
+                Relation::Disjoint | Relation::Contained => {}
             }
         }
         relation
@@ -195,25 +199,37 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiPolygon<'a> {
 }
 
 impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for ZultiPolygon<'a> {
-    fn relation(&self, other: &ZultiPolygon) -> crate::Relation {
+    fn relation(&self, other: &ZultiPolygon) -> Relation {
         if self.len() == 0 || other.len() == 0 {
-            return crate::Relation::Disjoint;
+            return Relation::Disjoint;
         }
-        if self.bounding_box().relation(other.bounding_box()) == crate::Relation::Disjoint {
-            return crate::Relation::Disjoint;
+        if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
+            return Relation::Disjoint;
         }
-        let mut relation = crate::Relation::Disjoint;
+        let mut relation = Relation::Disjoint;
         for zolygon in self.zolygons() {
             match zolygon.relation(other) {
                 // contains take precedence over everything else
-                crate::Relation::Contains => return crate::Relation::Contains,
+                Relation::Contains => return Relation::Contains,
                 // Inretsects take precedence over contained
-                crate::Relation::Contained if relation != crate::Relation::Intersects => relation = crate::Relation::Contained,
-                crate::Relation::Intersects => relation = crate::Relation::Intersects,
-                crate::Relation::Disjoint | crate::Relation::Contained => {}
+                Relation::Contained if relation != Relation::Intersects => {
+                    relation = Relation::Contained
+                }
+                Relation::Intersects => relation = Relation::Intersects,
+                Relation::Disjoint | Relation::Contained => {}
             }
         }
         relation
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zerometry<'a>> for ZultiPolygon<'a> {
+    fn relation(&self, other: &Zerometry<'a>) -> Relation {
+        match other.relation(self) {
+            Relation::Contains => Relation::Contained,
+            Relation::Contained => Relation::Contains,
+            r => r,
+        }
     }
 }
 

@@ -4,7 +4,8 @@ use std::io::{self, Write};
 use geo_types::MultiPoint;
 
 use crate::{
-    BoundingBox, Coords, Relation, RelationBetweenShapes, Zoint, Zolygon, ZultiPolygon, COORD_SIZE_IN_BYTES
+    BoundingBox, Coords, Relation, RelationBetweenShapes, Zerometry, Zoint, Zolygon, ZultiPolygon,
+    COORD_SIZE_IN_BYTES,
 };
 
 #[derive(Clone, Copy)]
@@ -100,6 +101,16 @@ impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for ZultiPoints<'a> {
         match other.relation(self) {
             Relation::Contains => Relation::Contains,
             Relation::Contained => Relation::Contained,
+            r => r,
+        }
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zerometry<'a>> for ZultiPoints<'a> {
+    fn relation(&self, other: &Zerometry<'a>) -> Relation {
+        match other.relation(self) {
+            Relation::Contains => Relation::Contained,
+            Relation::Contained => Relation::Contains,
             r => r,
         }
     }
