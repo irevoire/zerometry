@@ -104,10 +104,6 @@ impl<'a> ZultiPolygon<'a> {
             .get(index + 1)
             .unwrap_or(&(self.bytes.len() as u32));
         let bytes = &self.bytes[offset as usize..next_offset as usize];
-        println!(
-            "Making a polygon from {} to {} with bytes: {:?}",
-            offset, next_offset, bytes
-        );
         Some(Zolygon::from_bytes(bytes))
     }
 
@@ -115,8 +111,12 @@ impl<'a> ZultiPolygon<'a> {
         self.offsets.len()
     }
 
-    pub fn zolygons(&'a self) -> impl Iterator<Item = Zolygon<'a>> {
+    pub fn polygons(&'a self) -> impl Iterator<Item = Zolygon<'a>> {
         (0..self.len()).map(move |index| self.get(index).unwrap())
+    }
+
+    pub fn to_geo(&self) -> geo_types::MultiPolygon<f64> {
+        geo_types::MultiPolygon::new(self.polygons().map(|zolygon| zolygon.to_geo()).collect())
     }
 }
 
@@ -126,7 +126,7 @@ impl<'a> fmt::Debug for ZultiPolygon<'a> {
 
         impl<'b, 'a> fmt::Debug for ZolygonsDebug<'b, 'a> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.debug_list().entries(self.0.zolygons()).finish()
+                f.debug_list().entries(self.0.polygons()).finish()
             }
         }
 
@@ -145,7 +145,7 @@ impl<'a> RelationBetweenShapes<Zoint<'a>> for ZultiPolygon<'a> {
         if !self.bounding_box().contains_coord(&other.coord()) {
             return Relation::Disjoint;
         }
-        for zolygon in self.zolygons() {
+        for zolygon in self.polygons() {
             match zolygon.relation(other) {
                 Relation::Contains => return Relation::Contains,
                 _ => {}
@@ -163,7 +163,7 @@ impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for ZultiPolygon<'a> {
         if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
             return Relation::Disjoint;
         }
-        for zolygon in self.zolygons() {
+        for zolygon in self.polygons() {
             match zolygon.relation(other) {
                 Relation::Contains => return Relation::Contains,
                 _ => {}
@@ -182,7 +182,7 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiPolygon<'a> {
             return Relation::Disjoint;
         }
         let mut relation = Relation::Disjoint;
-        for zolygon in self.zolygons() {
+        for zolygon in self.polygons() {
             match zolygon.relation(other) {
                 // contains take precedence over everything else
                 Relation::Contains => return Relation::Contains,
@@ -207,7 +207,7 @@ impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for ZultiPolygon<'a> {
             return Relation::Disjoint;
         }
         let mut relation = Relation::Disjoint;
-        for zolygon in self.zolygons() {
+        for zolygon in self.polygons() {
             match zolygon.relation(other) {
                 // contains take precedence over everything else
                 Relation::Contains => return Relation::Contains,

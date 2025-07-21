@@ -49,6 +49,14 @@ impl<'a> Coord {
         &mut self.data[1]
     }
 
+    pub fn x(&self) -> f64 {
+        self.lng()
+    }
+    
+    pub fn y(&self) -> f64 {
+        self.lat()
+    }
+
     pub fn to_geo(&self) -> geo_types::Coord<f64> {
         geo_types::Coord {
             x: self.lng(),

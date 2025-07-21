@@ -1,7 +1,7 @@
 use core::fmt;
 use std::io::{self, Write};
 
-use geo_types::Polygon;
+use geo_types::{Geometry, Polygon};
 
 use crate::{
     BoundingBox, Coord, Coords, Relation, RelationBetweenShapes, Segment, Zerometry, Zoint,
@@ -79,6 +79,16 @@ impl<'a> Zolygon<'a> {
 
     pub fn is_empty(&self) -> bool {
         self.coords.len() == 0
+    }
+
+    pub fn to_geo(&self) -> geo_types::Polygon<f64> {
+        geo_types::Polygon::new(
+            self.coords
+                .iter()
+                .map(|coord| geo_types::Point::new(coord.lng(), coord.lat()))
+                .collect(),
+            Vec::new(),
+        )
     }
 }
 
@@ -200,6 +210,26 @@ impl<'a> RelationBetweenShapes<Zerometry<'a>> for Zolygon<'a> {
         match other.relation(self) {
             Relation::Contains => Relation::Contained,
             Relation::Contained => Relation::Contains,
+            r => r,
+        }
+    }
+}
+
+impl<'a> RelationBetweenShapes<Polygon<f64>> for Zolygon<'a> {
+    fn relation(&self, other: &Polygon<f64>) -> Relation {
+        let mut buffer = Vec::new();
+        Zerometry::write_from_geometry(&mut buffer, &Geometry::Polygon(other.clone()))
+            .unwrap();
+        let other = Zerometry::from_bytes(&buffer).unwrap();
+        self.relation(&other)
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zolygon<'a>> for Polygon<f64> {
+    fn relation(&self, other: &Zolygon<'a>) -> Relation {
+        match other.relation(self) {
+            Relation::Contains => Relation::Contains,
+            Relation::Contained => Relation::Contained,
             r => r,
         }
     }

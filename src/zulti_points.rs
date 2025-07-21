@@ -51,6 +51,15 @@ impl<'a> ZultiPoints<'a> {
     pub fn coords(&self) -> &'a Coords {
         self.coords
     }
+
+    pub fn to_geo(&self) -> geo_types::MultiPoint<f64> {
+        geo_types::MultiPoint::new(
+            self.coords
+                .iter()
+                .map(|coord| geo_types::Point::new(coord.lng(), coord.lat()))
+                .collect(),
+        )
+    }
 }
 
 impl<'a> fmt::Debug for ZultiPoints<'a> {

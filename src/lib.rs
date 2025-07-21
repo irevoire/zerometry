@@ -13,7 +13,7 @@ pub use bounding_box::BoundingBox;
 pub use coord::Coord;
 pub(crate) use coord::{COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS};
 pub use coords::Coords;
-use geo_types::Geometry;
+use geo_types::{Geometry, MultiPolygon, Polygon};
 pub use segment::Segment;
 pub use zoint::Zoint;
 pub use zolygon::Zolygon;
@@ -38,6 +38,22 @@ pub enum Relation {
 
 pub trait RelationBetweenShapes<Other: ?Sized> {
     fn relation(&self, other: &Other) -> Relation;
+
+    fn contains(&self, other: &Other) -> bool {
+        self.relation(other) == Relation::Contains
+    }
+
+    fn contained(&self, other: &Other) -> bool {
+        self.relation(other) == Relation::Contained
+    }
+
+    fn intersects(&self, other: &Other) -> bool {
+        self.relation(other) == Relation::Intersects
+    }
+
+    fn disjoint(&self, other: &Other) -> bool {
+        self.relation(other) == Relation::Disjoint
+    }
 }
 
 impl<'a> Zerometry<'a> {
@@ -81,6 +97,39 @@ impl<'a> Zerometry<'a> {
             _ => todo!(),
         }
         Ok(())
+    }
+
+    pub fn to_geo(&self) -> geo_types::Geometry<f64> {
+        match self {
+            Zerometry::Point(a) => Geometry::Point(a.to_geo()),
+            Zerometry::MultiPoints(a) => Geometry::MultiPoint(a.to_geo()),
+            Zerometry::Polygon(a) => Geometry::Polygon(a.to_geo()),
+            Zerometry::MultiPolygon(a) => Geometry::MultiPolygon(a.to_geo()),
+        }
+    }
+}
+
+impl<'a> From<Zoint<'a>> for Zerometry<'a> {
+    fn from(point: Zoint<'a>) -> Self {
+        Zerometry::Point(point)
+    }
+}
+
+impl<'a> From<ZultiPoints<'a>> for Zerometry<'a> {
+    fn from(points: ZultiPoints<'a>) -> Self {
+        Zerometry::MultiPoints(points)
+    }
+}
+
+impl<'a> From<Zolygon<'a>> for Zerometry<'a> {
+    fn from(polygon: Zolygon<'a>) -> Self {
+        Zerometry::Polygon(polygon)
+    }
+}
+
+impl<'a> From<ZultiPolygon<'a>> for Zerometry<'a> {
+    fn from(polygon: ZultiPolygon<'a>) -> Self {
+        Zerometry::MultiPolygon(polygon)
     }
 }
 
@@ -136,5 +185,43 @@ impl<'a> RelationBetweenShapes<Zerometry<'a>> for Zerometry<'a> {
             Zerometry::Polygon(a) => self.relation(a),
             Zerometry::MultiPolygon(a) => self.relation(a),
         }
+    }
+}
+
+impl<'a> RelationBetweenShapes<Geometry<f64>> for Zerometry<'a> {
+    fn relation(&self, other: &Geometry<f64>) -> Relation {
+        let mut buffer = Vec::new();
+        Zerometry::write_from_geometry(&mut buffer, other).unwrap();
+        let other = Zerometry::from_bytes(&buffer).unwrap();
+        self.relation(&other)
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zerometry<'a>> for Geometry<f64> {
+    fn relation(&self, other: &Zerometry<'a>) -> Relation {
+        let mut buffer = Vec::new();
+        Zerometry::write_from_geometry(&mut buffer, self).unwrap();
+        let this = Zerometry::from_bytes(&buffer).unwrap();
+        this.relation(other)
+    }
+}
+
+impl<'a> RelationBetweenShapes<Polygon<f64>> for Zerometry<'a> {
+    fn relation(&self, other: &Polygon<f64>) -> Relation {
+        let mut buffer = Vec::new();
+        Zerometry::write_from_geometry(&mut buffer, &Geometry::Polygon(other.clone()))
+            .unwrap();
+        let other = Zerometry::from_bytes(&buffer).unwrap();
+        self.relation(&other)
+    }
+}
+
+impl<'a> RelationBetweenShapes<MultiPolygon<f64>> for Zerometry<'a> {
+    fn relation(&self, other: &MultiPolygon<f64>) -> Relation {
+        let mut buffer = Vec::new();
+        Zerometry::write_from_geometry(&mut buffer, &Geometry::MultiPolygon(other.clone()))
+            .unwrap();
+        let other = Zerometry::from_bytes(&buffer).unwrap();
+        self.relation(&other)
     }
 }

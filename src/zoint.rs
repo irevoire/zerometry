@@ -35,6 +35,20 @@ impl<'a> Zoint<'a> {
         self.coord
     }
 
+    pub fn lat(&self) -> f64 {
+        self.coord.lat()
+    }
+    pub fn lng(&self) -> f64 {
+        self.coord.lng()
+    }
+
+    pub fn x(&self) -> f64 {
+        self.coord.lng()
+    }
+    pub fn y(&self) -> f64 {
+        self.coord.lat()
+    }
+
     pub fn to_geo(&self) -> geo_types::Point<f64> {
         geo_types::Point::new(self.coord.lng(), self.coord.lat())
     }
