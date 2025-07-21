@@ -147,7 +147,6 @@ mod tests {
         Segment::from_bytes(&cast_slice(&data));
     }
 
-
     #[test]
     #[should_panic]
     fn test_segment_from_bytes_panic_on_too_many_point_bytes() {

@@ -48,7 +48,9 @@ impl<'a> Coords {
     }
 
     pub fn consecutive_pairs(&self) -> impl Iterator<Item = &[f64]> {
-        self.data.windows(COORD_SIZE_IN_FLOATS * 2).step_by(COORD_SIZE_IN_FLOATS)
+        self.data
+            .windows(COORD_SIZE_IN_FLOATS * 2)
+            .step_by(COORD_SIZE_IN_FLOATS)
     }
 }
 
@@ -88,7 +90,10 @@ mod tests {
         assert_eq!(coords[1].lat(), 4.0);
         // iter works
         assert_eq!(
-            coords.iter().map(|c| (c.lng(), c.lat())).collect::<Vec<_>>(),
+            coords
+                .iter()
+                .map(|c| (c.lng(), c.lat()))
+                .collect::<Vec<_>>(),
             vec![(1.0, 2.0), (3.0, 4.0)]
         );
         // Debug+iter works
@@ -131,7 +136,10 @@ mod tests {
         assert_eq!(coords[1].lat(), 4.0);
         // iter works
         assert_eq!(
-            coords.iter().map(|c| (c.lng(), c.lat())).collect::<Vec<_>>(),
+            coords
+                .iter()
+                .map(|c| (c.lng(), c.lat()))
+                .collect::<Vec<_>>(),
             vec![(1.0, 2.0), (3.0, 4.0)]
         );
         // Debug+iter works

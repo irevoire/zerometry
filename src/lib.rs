@@ -1,19 +1,21 @@
 mod bounding_box;
 mod coord;
 mod coords;
-mod zulti_points;
-mod zoint;
 mod segment;
+mod zoint;
 mod zolygon;
+mod zulti_points;
+mod zulti_polygon;
 
 pub use bounding_box::BoundingBox;
-pub use zoint::Zoint;
-pub use zulti_points::ZultiPoints;
-pub use segment::Segment;
 pub use coord::Coord;
 pub(crate) use coord::{COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS};
 pub use coords::Coords;
+pub use segment::Segment;
+pub use zoint::Zoint;
 pub use zolygon::Zolygon;
+pub use zulti_points::ZultiPoints;
+pub use zulti_polygon::ZultiPolygon;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Zerometry<'a> {

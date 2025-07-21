@@ -5,7 +5,6 @@ use geo_types::Point;
 
 use crate::{Coord, Relation, RelationBetweenShapes, Zolygon, ZultiPoints};
 
-
 #[derive(Clone, Copy)]
 pub struct Zoint<'a> {
     coord: &'a Coord,
@@ -21,7 +20,10 @@ impl<'a> Zoint<'a> {
         Self::new(coord)
     }
 
-    pub fn write_from_geometry(writer: &mut impl Write, geometry: &Point<f64>) -> Result<(), io::Error> {
+    pub fn write_from_geometry(
+        writer: &mut impl Write,
+        geometry: &Point<f64>,
+    ) -> Result<(), io::Error> {
         writer.write_all(&geometry.x().to_ne_bytes())?;
         writer.write_all(&geometry.y().to_ne_bytes())?;
         Ok(())

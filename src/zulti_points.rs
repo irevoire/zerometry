@@ -3,8 +3,9 @@ use std::io::{self, Write};
 
 use geo_types::MultiPoint;
 
-use crate::{BoundingBox, Coords, Relation, RelationBetweenShapes, Zoint, Zolygon, COORD_SIZE_IN_BYTES};
-
+use crate::{
+    BoundingBox, Coords, Relation, RelationBetweenShapes, Zoint, Zolygon, COORD_SIZE_IN_BYTES,
+};
 
 #[derive(Clone, Copy)]
 pub struct ZultiPoints<'a> {
@@ -26,7 +27,10 @@ impl<'a> ZultiPoints<'a> {
         Self::new(bounding_box, coords)
     }
 
-    pub fn write_from_geometry(writer: &mut impl Write, geometry: &MultiPoint<f64>) -> Result<(), io::Error> {
+    pub fn write_from_geometry(
+        writer: &mut impl Write,
+        geometry: &MultiPoint<f64>,
+    ) -> Result<(), io::Error> {
         BoundingBox::write_from_geometry(writer, geometry.iter().copied())?;
         for point in geometry.iter() {
             writer.write_all(&point.x().to_ne_bytes())?;
@@ -89,7 +93,10 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiPoints<'a> {
 
 impl<'a> PartialEq<MultiPoint<f64>> for ZultiPoints<'a> {
     fn eq(&self, other: &MultiPoint<f64>) -> bool {
-        self.coords.iter().zip(other.iter()).all(|(a, b)| a.lng() == b.x() && a.lat() == b.y())
+        self.coords
+            .iter()
+            .zip(other.iter())
+            .all(|(a, b)| a.lng() == b.x() && a.lat() == b.y())
     }
 }
 
@@ -104,7 +111,11 @@ mod tests {
     #[test]
     fn test_zulti_points_binary_format() {
         let mut buffer = Vec::new();
-        ZultiPoints::write_from_geometry(&mut buffer, &MultiPoint::from(vec![Point::new(1.0, 2.0), Point::new(3.0, 4.0)])).unwrap();
+        ZultiPoints::write_from_geometry(
+            &mut buffer,
+            &MultiPoint::from(vec![Point::new(1.0, 2.0), Point::new(3.0, 4.0)]),
+        )
+        .unwrap();
         let input: &[f64] = cast_slice(&buffer);
         assert_compact_debug_snapshot!(input, @"[1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 4.0]");
         let zulti_points = ZultiPoints::from_bytes(&buffer);

@@ -1,9 +1,15 @@
 use core::fmt;
-use std::{io::{self, Write}, mem, ops::RangeInclusive};
+use std::{
+    io::{self, Write},
+    mem,
+    ops::RangeInclusive,
+};
 
 use geo_types::Point;
 
-use crate::{Coord, Coords, Relation, RelationBetweenShapes};
+use crate::{Coord, Coords, Relation, RelationBetweenShapes, COORD_SIZE_IN_BYTES};
+
+pub(crate) const BOUNDING_BOX_SIZE_IN_BYTES: usize = COORD_SIZE_IN_BYTES * 2;
 
 /// Bounding box of a Zerometry.
 ///
@@ -31,21 +37,45 @@ impl BoundingBox {
     }
 
     pub fn from_coords(coords: &Coords) -> &Self {
-        debug_assert_eq!(coords.len(), 2, "Bounding box must have 2 coordinates but instead got {}", coords.len());
-        debug_assert!(coords[0].lng() <= coords[1].lng(), "Bounding box must have the left side before the right side");
-        debug_assert!(coords[0].lat() <= coords[1].lat(), "Bounding box must have the bottom side before the top side");
+        debug_assert_eq!(
+            coords.len(),
+            2,
+            "Bounding box must have 2 coordinates but instead got {}",
+            coords.len()
+        );
+        debug_assert!(
+            coords[0].lng() <= coords[1].lng(),
+            "Bounding box must have the left side before the right side"
+        );
+        debug_assert!(
+            coords[0].lat() <= coords[1].lat(),
+            "Bounding box must have the bottom side before the top side"
+        );
         unsafe { mem::transmute(coords) }
     }
 
     pub fn from_coords_mut(coords: &mut Coords) -> &mut Self {
-        debug_assert_eq!(coords.len(), 2, "Bounding box must have 2 coordinates but instead got {}", coords.len());
-        debug_assert!(coords[0].lng() <= coords[1].lng(), "Bounding box must have the left side before the right side");
-        debug_assert!(coords[0].lat() <= coords[1].lat(), "Bounding box must have the bottom side before the top side");
+        debug_assert_eq!(
+            coords.len(),
+            2,
+            "Bounding box must have 2 coordinates but instead got {}",
+            coords.len()
+        );
+        debug_assert!(
+            coords[0].lng() <= coords[1].lng(),
+            "Bounding box must have the left side before the right side"
+        );
+        debug_assert!(
+            coords[0].lat() <= coords[1].lat(),
+            "Bounding box must have the bottom side before the top side"
+        );
         unsafe { mem::transmute(coords) }
     }
 
-
-    pub fn write_from_geometry(writer: &mut impl Write, mut points: impl Iterator<Item = Point<f64>>) -> Result<(), io::Error> {
+    pub fn write_from_geometry(
+        writer: &mut impl Write,
+        mut points: impl Iterator<Item = Point<f64>>,
+    ) -> Result<(), io::Error> {
         // if there is no points we ends up with an empty bouding box in 0,0 and on points in the polygon
         let first_point = points.next().unwrap_or_default();
         let mut top = first_point.y();
@@ -67,7 +97,7 @@ impl BoundingBox {
                 right = point.x();
             }
         }
-        
+
         // 1. Write the bounding box
         //   It's bottom left first
         writer.write_all(&left.to_ne_bytes())?;
@@ -111,7 +141,8 @@ impl BoundingBox {
     }
 
     pub fn contains_coord(&self, coord: &Coord) -> bool {
-        self.vertical_range().contains(&coord.lat()) && self.horizontal_range().contains(&coord.lng())
+        self.vertical_range().contains(&coord.lat())
+            && self.horizontal_range().contains(&coord.lng())
     }
 }
 
@@ -144,7 +175,11 @@ impl RelationBetweenShapes<BoundingBox> for BoundingBox {
             Relation::Contains
         } else if contained_bottom_left && contained_top_right {
             Relation::Contained
-        } else if contained_bottom_left || contained_top_right || contains_bottom_left || contains_top_right {
+        } else if contained_bottom_left
+            || contained_top_right
+            || contains_bottom_left
+            || contains_top_right
+        {
             Relation::Intersects
         } else {
             Relation::Disjoint
@@ -182,7 +217,6 @@ mod tests {
         let data = [1.0, 2.0];
         BoundingBox::from_bytes(&cast_slice(&data));
     }
-
 
     #[test]
     #[should_panic]
@@ -254,21 +288,54 @@ mod tests {
     #[test]
     fn test_bounding_box_relation_to_coord() {
         let bb = BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0]);
-        assert_eq!(bb.relation(Coord::from_slice(&[2.0, 3.0])), Relation::Contains);
-        assert_eq!(bb.relation(Coord::from_slice(&[0.0, 0.0])), Relation::Contains);
-        assert_eq!(bb.relation(Coord::from_slice(&[10.0, 10.0])), Relation::Contains);
-        assert_eq!(bb.relation(Coord::from_slice(&[11.0, 11.0])), Relation::Disjoint);
-        assert_eq!(bb.relation(Coord::from_slice(&[-1.0, -1.0])), Relation::Disjoint);
+        assert_eq!(
+            bb.relation(Coord::from_slice(&[2.0, 3.0])),
+            Relation::Contains
+        );
+        assert_eq!(
+            bb.relation(Coord::from_slice(&[0.0, 0.0])),
+            Relation::Contains
+        );
+        assert_eq!(
+            bb.relation(Coord::from_slice(&[10.0, 10.0])),
+            Relation::Contains
+        );
+        assert_eq!(
+            bb.relation(Coord::from_slice(&[11.0, 11.0])),
+            Relation::Disjoint
+        );
+        assert_eq!(
+            bb.relation(Coord::from_slice(&[-1.0, -1.0])),
+            Relation::Disjoint
+        );
     }
 
     #[test]
     fn test_bounding_box_relation_to_bounding_box() {
         let bb = BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0]);
-        assert_eq!(bb.relation(BoundingBox::from_slice(&[1.0, 1.0, 3.0, 3.0])), Relation::Contains);
-        assert_eq!(bb.relation(BoundingBox::from_slice(&[-1.0, 0.0, 1.0, 2.0])), Relation::Intersects);
-        assert_eq!(bb.relation(BoundingBox::from_slice(&[10.0, 0.0, 20.0, 10.0])), Relation::Intersects);
-        assert_eq!(bb.relation(BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0])), Relation::Contains);
-        assert_eq!(bb.relation(BoundingBox::from_slice(&[-1.0, -1.0, 11.0, 11.0])), Relation::Contained);
-        assert_eq!(bb.relation(BoundingBox::from_slice(&[11.0, 11.0, 12.0, 12.0])), Relation::Disjoint);
+        assert_eq!(
+            bb.relation(BoundingBox::from_slice(&[1.0, 1.0, 3.0, 3.0])),
+            Relation::Contains
+        );
+        assert_eq!(
+            bb.relation(BoundingBox::from_slice(&[-1.0, 0.0, 1.0, 2.0])),
+            Relation::Intersects
+        );
+        assert_eq!(
+            bb.relation(BoundingBox::from_slice(&[10.0, 0.0, 20.0, 10.0])),
+            Relation::Intersects
+        );
+        assert_eq!(
+            bb.relation(BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0])),
+            Relation::Contains
+        );
+        assert_eq!(
+            bb.relation(BoundingBox::from_slice(&[-1.0, -1.0, 11.0, 11.0])),
+            Relation::Contained
+        );
+        assert_eq!(
+            bb.relation(BoundingBox::from_slice(&[11.0, 11.0, 12.0, 12.0])),
+            Relation::Disjoint
+        );
     }
 }

@@ -1,9 +1,12 @@
 use core::fmt;
-use std::io::{Write, self};
+use std::io::{self, Write};
 
 use geo_types::Polygon;
 
-use crate::{BoundingBox, Coord, Coords, Relation, RelationBetweenShapes, Segment, Zoint, ZultiPoints, COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS};
+use crate::{
+    BoundingBox, Coord, Coords, Relation, RelationBetweenShapes, Segment, Zoint, ZultiPoints,
+    COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS,
+};
 
 /// A polygon is a closed shape defined by a list of coordinates.
 ///
@@ -20,19 +23,36 @@ pub struct Zolygon<'a> {
 
 impl<'a> Zolygon<'a> {
     pub fn new(bounding_box: &'a BoundingBox, coords: &'a Coords) -> Self {
-        Self { bounding_box, coords }
+        Self {
+            bounding_box,
+            coords,
+        }
     }
 
     pub fn from_bytes(data: &'a [u8]) -> Self {
-        debug_assert!(data.len() % COORD_SIZE_IN_FLOATS == 0, "Data length must be a multiple of {}", COORD_SIZE_IN_FLOATS);
-        debug_assert!(data.len() >= COORD_SIZE_IN_FLOATS * 2, "Data length must be at least 2 coordinates to hold the bounding box");
-        debug_assert!(data.as_ptr() as usize % COORD_SIZE_IN_FLOATS == 0, "Data must be aligned to {}", COORD_SIZE_IN_FLOATS);
+        debug_assert!(
+            data.len() % COORD_SIZE_IN_FLOATS == 0,
+            "Data length must be a multiple of {}",
+            COORD_SIZE_IN_FLOATS
+        );
+        debug_assert!(
+            data.len() >= COORD_SIZE_IN_FLOATS * 2,
+            "Data length must be at least 2 coordinates to hold the bounding box"
+        );
+        debug_assert!(
+            data.as_ptr() as usize % COORD_SIZE_IN_FLOATS == 0,
+            "Data must be aligned to {}",
+            COORD_SIZE_IN_FLOATS
+        );
         let bounding_box = BoundingBox::from_bytes(&data[0..COORD_SIZE_IN_BYTES * 2]);
         let coords = Coords::from_bytes(&data[COORD_SIZE_IN_BYTES * 2..]);
         Self::new(bounding_box, coords)
     }
 
-    pub fn write_from_geometry(writer: &mut impl Write, geometry: &Polygon<f64>) -> Result<(), io::Error> {
+    pub fn write_from_geometry(
+        writer: &mut impl Write,
+        geometry: &Polygon<f64>,
+    ) -> Result<(), io::Error> {
         BoundingBox::write_from_geometry(writer, geometry.exterior().points())?;
 
         for point in geometry.exterior().points() {
@@ -40,7 +60,7 @@ impl<'a> Zolygon<'a> {
             writer.write_all(&point.y().to_ne_bytes())?;
         }
 
-        Ok(())   
+        Ok(())
     }
 
     pub fn bounding_box(&self) -> &'a BoundingBox {
@@ -52,7 +72,9 @@ impl<'a> Zolygon<'a> {
     }
 
     pub fn segments(&self) -> impl Iterator<Item = Segment<'a>> {
-        self.coords.consecutive_pairs().map(|chunk| Segment::from_slice(chunk))
+        self.coords
+            .consecutive_pairs()
+            .map(|chunk| Segment::from_slice(chunk))
     }
 
     pub fn is_empty(&self) -> bool {
@@ -71,7 +93,7 @@ impl<'a> fmt::Debug for Zolygon<'a> {
 
 impl<'a> RelationBetweenShapes<Coord> for Zolygon<'a> {
     fn relation(&self, other: &Coord) -> Relation {
-        if self.is_empty(){
+        if self.is_empty() {
             return Relation::Disjoint;
         }
 
@@ -168,7 +190,10 @@ impl<'a> PartialEq<Polygon<f64>> for Zolygon<'a> {
         if !other.interiors().is_empty() {
             return false;
         }
-        self.coords.iter().zip(other.exterior().points()).all(|(a, b)| a.lng() == b.x() && a.lat() == b.y())
+        self.coords
+            .iter()
+            .zip(other.exterior().points())
+            .all(|(a, b)| a.lng() == b.x() && a.lat() == b.y())
     }
 }
 
@@ -184,14 +209,21 @@ mod tests {
     fn test_zolygon_binary_format() {
         // 2 coordinates for the bounding box and 3 coordinates for the polygon
         let mut buffer = Vec::new();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
-            geo_types::Coord {x: -10.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: -10.0},
-            geo_types::Coord {x: 10.0, y: 10.0},
-            geo_types::Coord {x: 0.0, y: 10.0},
-            // Here we forgot to close the polygon but it should be done automatically by the geometry library
-            // A polygon MUST be closed
-        ]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(
+                LineString::new(vec![
+                    geo_types::Coord { x: -10.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: -10.0 },
+                    geo_types::Coord { x: 10.0, y: 10.0 },
+                    geo_types::Coord { x: 0.0, y: 10.0 },
+                    // Here we forgot to close the polygon but it should be done automatically by the geometry library
+                    // A polygon MUST be closed
+                ]),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let input: &[f64] = cast_slice(&buffer);
         assert_debug_snapshot!(input, @r"
         [
@@ -250,11 +282,14 @@ mod tests {
         ");
     }
 
-
     #[test]
     fn test_zolygon_empty_binary_format() {
         let mut buffer = Vec::new();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(LineString::new(vec![]), Vec::new()),
+        )
+        .unwrap();
         let input: &[f64] = cast_slice(&buffer);
         assert_debug_snapshot!(input, @r"
         [
@@ -284,12 +319,19 @@ mod tests {
     fn test_zolygon_relation_to_zoint() {
         // 2 coordinates for the bounding box and 3 coordinates for the polygon
         let mut buffer = Vec::new();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
-            geo_types::Coord {x: 0.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: 10.0},
-            geo_types::Coord {x: 0.0, y: 10.0},
-        ]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(
+                LineString::new(vec![
+                    geo_types::Coord { x: 0.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: 10.0 },
+                    geo_types::Coord { x: 0.0, y: 10.0 },
+                ]),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let zoint_inside_bytes = buffer.len();
         Zoint::write_from_geometry(&mut buffer, &Point::new(5.0, 5.0)).unwrap();
         let zoint_outside_bytes = buffer.len();
@@ -305,89 +347,162 @@ mod tests {
     #[test]
     fn test_zolygon_relation_to_zolygon_intersects_basic() {
         let mut buffer = Vec::new();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
-            geo_types::Coord {x: 0.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: 10.0},
-            geo_types::Coord {x: 0.0, y: 10.0},
-        ]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(
+                LineString::new(vec![
+                    geo_types::Coord { x: 0.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: 10.0 },
+                    geo_types::Coord { x: 0.0, y: 10.0 },
+                ]),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let first = buffer.len();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
-            geo_types::Coord {x: 5.0, y: 5.0},
-            geo_types::Coord {x: 15.0, y: 5.0},
-            geo_types::Coord {x: 15.0, y: 15.0},
-            geo_types::Coord {x: 5.0, y: 15.0},
-        ]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(
+                LineString::new(vec![
+                    geo_types::Coord { x: 5.0, y: 5.0 },
+                    geo_types::Coord { x: 15.0, y: 5.0 },
+                    geo_types::Coord { x: 15.0, y: 15.0 },
+                    geo_types::Coord { x: 5.0, y: 15.0 },
+                ]),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let second = buffer.len();
         let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
         let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
-        assert_eq!(first_zolygon.relation(&second_zolygon), Relation::Intersects);
-        assert_eq!(second_zolygon.relation(&first_zolygon), Relation::Intersects);
+        assert_eq!(
+            first_zolygon.relation(&second_zolygon),
+            Relation::Intersects
+        );
+        assert_eq!(
+            second_zolygon.relation(&first_zolygon),
+            Relation::Intersects
+        );
     }
 
     #[test]
     fn test_zolygon_relation_to_zolygon_intersects_diagonal() {
         let mut buffer = Vec::new();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
-            geo_types::Coord {x: 0.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: 10.0},
-            geo_types::Coord {x: 0.0, y: 10.0},
-        ]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(
+                LineString::new(vec![
+                    geo_types::Coord { x: 0.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: 10.0 },
+                    geo_types::Coord { x: 0.0, y: 10.0 },
+                ]),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let first = buffer.len();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
-            geo_types::Coord {x: 5.0, y: 7.0},
-            geo_types::Coord {x: 8.0, y: 10.0},
-            geo_types::Coord {x: 5.0, y: 13.0},
-            geo_types::Coord {x: 2.0, y: 10.0},
-        ]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(
+                LineString::new(vec![
+                    geo_types::Coord { x: 5.0, y: 7.0 },
+                    geo_types::Coord { x: 8.0, y: 10.0 },
+                    geo_types::Coord { x: 5.0, y: 13.0 },
+                    geo_types::Coord { x: 2.0, y: 10.0 },
+                ]),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let second = buffer.len();
         let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
         let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
-        assert_eq!(first_zolygon.relation(&second_zolygon), Relation::Intersects);
-        assert_eq!(second_zolygon.relation(&first_zolygon), Relation::Intersects);
+        assert_eq!(
+            first_zolygon.relation(&second_zolygon),
+            Relation::Intersects
+        );
+        assert_eq!(
+            second_zolygon.relation(&first_zolygon),
+            Relation::Intersects
+        );
     }
-
 
     #[test]
     fn test_zolygon_relation_to_zolygon_intersects_on_edge() {
         let mut buffer = Vec::new();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
-            geo_types::Coord {x: 0.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: 10.0},
-            geo_types::Coord {x: 0.0, y: 10.0},
-        ]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(
+                LineString::new(vec![
+                    geo_types::Coord { x: 0.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: 10.0 },
+                    geo_types::Coord { x: 0.0, y: 10.0 },
+                ]),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let first = buffer.len();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
-            geo_types::Coord {x: 10.0, y: 0.0},
-            geo_types::Coord {x: 15.0, y: 0.0},
-            geo_types::Coord {x: 15.0, y: 10.0},
-            geo_types::Coord {x: 10.0, y: 10.0},
-        ]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(
+                LineString::new(vec![
+                    geo_types::Coord { x: 10.0, y: 0.0 },
+                    geo_types::Coord { x: 15.0, y: 0.0 },
+                    geo_types::Coord { x: 15.0, y: 10.0 },
+                    geo_types::Coord { x: 10.0, y: 10.0 },
+                ]),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let second = buffer.len();
         let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
         let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
-        assert_eq!(first_zolygon.relation(&second_zolygon), Relation::Intersects);
-        assert_eq!(second_zolygon.relation(&first_zolygon), Relation::Intersects);
+        assert_eq!(
+            first_zolygon.relation(&second_zolygon),
+            Relation::Intersects
+        );
+        assert_eq!(
+            second_zolygon.relation(&first_zolygon),
+            Relation::Intersects
+        );
     }
 
     #[test]
     fn test_zolygon_relation_to_zolygon_contains() {
         let mut buffer = Vec::new();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
-            geo_types::Coord {x: 0.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: 10.0},
-            geo_types::Coord {x: 0.0, y: 10.0},
-        ]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(
+                LineString::new(vec![
+                    geo_types::Coord { x: 0.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: 10.0 },
+                    geo_types::Coord { x: 0.0, y: 10.0 },
+                ]),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let first = buffer.len();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
-            geo_types::Coord {x: 1.0, y: 1.0},
-            geo_types::Coord {x: 1.0, y: 9.0},
-            geo_types::Coord {x: 9.0, y: 9.0},
-            geo_types::Coord {x: 9.0, y: 1.0},
-        ]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(
+                LineString::new(vec![
+                    geo_types::Coord { x: 1.0, y: 1.0 },
+                    geo_types::Coord { x: 1.0, y: 9.0 },
+                    geo_types::Coord { x: 9.0, y: 9.0 },
+                    geo_types::Coord { x: 9.0, y: 1.0 },
+                ]),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let second = buffer.len();
         let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
         let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
@@ -399,19 +514,33 @@ mod tests {
     #[test]
     fn test_zolygon_relation_to_zolygon_disjoint_basic() {
         let mut buffer = Vec::new();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
-            geo_types::Coord {x: 0.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: 10.0},
-            geo_types::Coord {x: 0.0, y: 10.0},
-        ]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(
+                LineString::new(vec![
+                    geo_types::Coord { x: 0.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: 10.0 },
+                    geo_types::Coord { x: 0.0, y: 10.0 },
+                ]),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let first = buffer.len();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
-            geo_types::Coord {x: 15.0, y: 15.0},
-            geo_types::Coord {x: 15.0, y: 25.0},
-            geo_types::Coord {x: 25.0, y: 25.0},
-            geo_types::Coord {x: 25.0, y: 15.0},
-        ]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(
+                LineString::new(vec![
+                    geo_types::Coord { x: 15.0, y: 15.0 },
+                    geo_types::Coord { x: 15.0, y: 25.0 },
+                    geo_types::Coord { x: 25.0, y: 25.0 },
+                    geo_types::Coord { x: 25.0, y: 15.0 },
+                ]),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let second = buffer.len();
         let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
         let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
@@ -422,17 +551,31 @@ mod tests {
     #[test]
     fn test_zolygon_relation_to_zolygon_disjoint_near() {
         let mut buffer = Vec::new();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
-            geo_types::Coord {x: 0.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: 0.0},
-            geo_types::Coord {x: 10.0, y: 10.0},
-        ]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(
+                LineString::new(vec![
+                    geo_types::Coord { x: 0.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: 0.0 },
+                    geo_types::Coord { x: 10.0, y: 10.0 },
+                ]),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let first = buffer.len();
-        Zolygon::write_from_geometry(&mut buffer, &Polygon::new(LineString::new(vec![
-            geo_types::Coord {x: 0.0, y: 1.0},
-            geo_types::Coord {x: 10.0, y: 11.0},
-            geo_types::Coord {x: 0.0, y: 11.0},
-        ]), Vec::new())).unwrap();
+        Zolygon::write_from_geometry(
+            &mut buffer,
+            &Polygon::new(
+                LineString::new(vec![
+                    geo_types::Coord { x: 0.0, y: 1.0 },
+                    geo_types::Coord { x: 10.0, y: 11.0 },
+                    geo_types::Coord { x: 0.0, y: 11.0 },
+                ]),
+                Vec::new(),
+            ),
+        )
+        .unwrap();
         let second = buffer.len();
         let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
         let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
