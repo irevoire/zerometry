@@ -108,8 +108,8 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiPoints<'a> {
 impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for ZultiPoints<'a> {
     fn relation(&self, other: &ZultiPolygon<'a>) -> Relation {
         match other.relation(self) {
-            Relation::Contains => Relation::Contains,
-            Relation::Contained => Relation::Contained,
+            Relation::Contains => Relation::Contained,
+            Relation::Contained => Relation::Contains,
             r => r,
         }
     }

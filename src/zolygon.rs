@@ -198,8 +198,8 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zolygon<'a> {
 impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for Zolygon<'a> {
     fn relation(&self, other: &ZultiPolygon<'a>) -> Relation {
         match other.relation(self) {
-            Relation::Contains => Relation::Contains,
-            Relation::Contained => Relation::Contained,
+            Relation::Contains => Relation::Contained,
+            Relation::Contained => Relation::Contains,
             r => r,
         }
     }
@@ -218,8 +218,7 @@ impl<'a> RelationBetweenShapes<Zerometry<'a>> for Zolygon<'a> {
 impl<'a> RelationBetweenShapes<Polygon<f64>> for Zolygon<'a> {
     fn relation(&self, other: &Polygon<f64>) -> Relation {
         let mut buffer = Vec::new();
-        Zerometry::write_from_geometry(&mut buffer, &Geometry::Polygon(other.clone()))
-            .unwrap();
+        Zerometry::write_from_geometry(&mut buffer, &Geometry::Polygon(other.clone())).unwrap();
         let other = Zerometry::from_bytes(&buffer).unwrap();
         self.relation(&other)
     }
@@ -228,8 +227,8 @@ impl<'a> RelationBetweenShapes<Polygon<f64>> for Zolygon<'a> {
 impl<'a> RelationBetweenShapes<Zolygon<'a>> for Polygon<f64> {
     fn relation(&self, other: &Zolygon<'a>) -> Relation {
         match other.relation(self) {
-            Relation::Contains => Relation::Contains,
-            Relation::Contained => Relation::Contained,
+            Relation::Contains => Relation::Contained,
+            Relation::Contained => Relation::Contains,
             r => r,
         }
     }

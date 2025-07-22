@@ -96,8 +96,8 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zoint<'a> {
 impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for Zoint<'a> {
     fn relation(&self, other: &ZultiPolygon<'a>) -> Relation {
         match other.relation(self) {
-            Relation::Contains => Relation::Contains,
-            Relation::Contained => Relation::Contained,
+            Relation::Contains => Relation::Contained,
+            Relation::Contained => Relation::Contains,
             r => r,
         }
     }

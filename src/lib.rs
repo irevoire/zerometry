@@ -2,6 +2,8 @@ mod bounding_box;
 mod coord;
 mod coords;
 mod segment;
+#[cfg(test)]
+mod test;
 mod zoint;
 mod zolygon;
 mod zulti_points;
@@ -209,8 +211,7 @@ impl<'a> RelationBetweenShapes<Zerometry<'a>> for Geometry<f64> {
 impl<'a> RelationBetweenShapes<Polygon<f64>> for Zerometry<'a> {
     fn relation(&self, other: &Polygon<f64>) -> Relation {
         let mut buffer = Vec::new();
-        Zerometry::write_from_geometry(&mut buffer, &Geometry::Polygon(other.clone()))
-            .unwrap();
+        Zerometry::write_from_geometry(&mut buffer, &Geometry::Polygon(other.clone())).unwrap();
         let other = Zerometry::from_bytes(&buffer).unwrap();
         self.relation(&other)
     }

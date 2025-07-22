@@ -52,7 +52,7 @@ impl<'a> Coord {
     pub fn x(&self) -> f64 {
         self.lng()
     }
-    
+
     pub fn y(&self) -> f64 {
         self.lat()
     }

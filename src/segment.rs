@@ -45,65 +45,7 @@ impl<'a> Segment<'a> {
 
     /// Returns true if the segment intersects with the other segment.
     pub fn intersects(&self, other: &Segment) -> bool {
-        // Helper to compute the orientation of the triplet (p, q, r)
-        // Returns:
-        // 0 -> Collinear
-        // 1 -> Clockwise
-        // 2 -> Counter-clockwise
-        fn orientation(p: &Coord, q: &Coord, r: &Coord) -> i32 {
-            let val = (q.lat() - p.lat()) * (r.lng() - q.lng())
-                - (q.lng() - p.lng()) * (r.lat() - q.lat());
-            if val.abs() < f64::EPSILON {
-                0
-            } else if val > 0.0 {
-                1
-            } else {
-                2
-            }
-        }
-
-        // Helper to check if point q lies on segment pr (assuming collinear)
-        fn on_segment(p: &Coord, q: &Coord, r: &Coord) -> bool {
-            q.lng() >= p.lng().min(r.lng())
-                && q.lng() <= p.lng().max(r.lng())
-                && q.lat() >= p.lat().min(r.lat())
-                && q.lat() <= p.lat().max(r.lat())
-        }
-
-        let p1 = self.start();
-        let q1 = self.end();
-        let p2 = other.start();
-        let q2 = other.end();
-
-        let o1 = orientation(p1, q1, p2);
-        let o2 = orientation(p1, q1, q2);
-        let o3 = orientation(p2, q2, p1);
-        let o4 = orientation(p2, q2, q1);
-
-        // General case – we additionally require the cross-product of the direction
-        // vectors to be positive. This makes the check directional which matches the
-        // current crate's semantics (see tests in `segment::tests`).
-        if o1 != o2 && o3 != o4 {
-            let cross_rs = (q1.lng() - p1.lng()) * (q2.lat() - p2.lat())
-                - (q1.lat() - p1.lat()) * (q2.lng() - p2.lng());
-            return cross_rs > 0.0;
-        }
-
-        // Special Cases – checking for collinear points lying on the segments
-        if o1 == 0 && on_segment(p1, p2, q1) {
-            return true;
-        }
-        if o2 == 0 && on_segment(p1, q2, q1) {
-            return true;
-        }
-        if o3 == 0 && on_segment(p2, p1, q2) {
-            return true;
-        }
-        if o4 == 0 && on_segment(p2, q1, q2) {
-            return true;
-        }
-
-        false
+        geo::intersects::Intersects::intersects(&geo_types::Line::new(self.start.to_geo(), self.end.to_geo()), &geo_types::Line::new(other.start.to_geo(), other.end.to_geo()))
     }
 }
 
@@ -207,7 +149,7 @@ mod tests {
         assert!(segment1.intersects(&segment2));
         let segment1 = Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]);
         let segment2 = Segment::from_slice(&[0.0, 1.0, 1.0, 0.0]);
-        assert!(!segment1.intersects(&segment2));
+        assert!(segment1.intersects(&segment2));
     }
 
     #[test]
@@ -231,5 +173,14 @@ mod tests {
         let segment1 = Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]);
         let segment2 = Segment::from_slice(&[0.5, 0.5, -1.0, -1.0]);
         assert!(segment1.intersects(&segment2));
+    }
+
+    #[test]
+    fn bug_missing_intersection() {
+        // ray: Segment { start: Coord { x: -6.436337296790293, y: 49.63676497357687 }, end: Coord { x: 6.0197316417968105, y: 49.63676497357687 } }
+        // segment: Segment { start: Coord { x: 1.188509553443464, y: 49.47027919866874 }, end: Coord { x: 3.6300086390995316, y: 50.610463312569514 } }
+        let ray = Segment::from_slice(&[-6.436337296790293, 49.63676497357687, 6.0197316417968105, 49.63676497357687]);
+        let segment = Segment::from_slice(&[1.188509553443464, 49.47027919866874, 3.6300086390995316, 50.610463312569514]);
+        assert!(segment.intersects(&ray));
     }
 }
