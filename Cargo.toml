@@ -7,6 +7,7 @@ description = "Make some zerocopy operations on serialized geo data"
 documentation = "https://docs.rs/zerometry"
 repository = "https://github.com/irevoire/zerometry"
 authors = ["Tamo <tamo@meilisearch.com>"]
+keywords = ["geo", "geography", "zerocopy", "serialize"]
 
 [dependencies]
 byteorder = "1.4"
