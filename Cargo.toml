@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 license-file = "LICENSE"
 description = "Make some zerocopy operations on serialized geo data"
-documentation = "https://docs.rs/steppe"
+documentation = "https://docs.rs/zerometry"
 repository = "https://github.com/irevoire/zerometry"
 authors = ["Tamo <tamo@meilisearch.com>"]
 
