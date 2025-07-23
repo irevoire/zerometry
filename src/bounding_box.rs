@@ -144,6 +144,10 @@ impl BoundingBox {
         self.vertical_range().contains(&coord.lat())
             && self.horizontal_range().contains(&coord.lng())
     }
+
+    pub fn to_geo(&self) -> geo_types::Rect<f64> {
+        geo_types::Rect::new(self.bottom_left().to_geo(), self.top_right().to_geo())
+    }
 }
 
 impl fmt::Debug for BoundingBox {
@@ -167,22 +171,31 @@ impl RelationBetweenShapes<Coord> for BoundingBox {
 
 impl RelationBetweenShapes<BoundingBox> for BoundingBox {
     fn relation(&self, other: &BoundingBox) -> Relation {
-        let contains_bottom_left = self.contains_coord(other.bottom_left());
-        let contains_top_right = self.contains_coord(other.top_right());
-        let contained_bottom_left = other.contains_coord(self.bottom_left());
-        let contained_top_right = other.contains_coord(self.top_right());
-        if contains_bottom_left && contains_top_right {
-            Relation::Contains
-        } else if contained_bottom_left && contained_top_right {
-            Relation::Contained
-        } else if contained_bottom_left
-            || contained_top_right
-            || contains_bottom_left
-            || contains_top_right
-        {
-            Relation::Intersects
-        } else {
-            Relation::Disjoint
+        let self_vertical_range = self.vertical_range();
+        let self_horizontal_range = self.horizontal_range();
+        let other_vertical_range = other.vertical_range();
+        let other_horizontal_range = other.horizontal_range();
+
+        match (
+            self_vertical_range.contains(other_vertical_range.start()),
+            self_vertical_range.contains(other_vertical_range.end()),
+            self_horizontal_range.contains(other_horizontal_range.start()),
+            self_horizontal_range.contains(other_horizontal_range.end()),
+        ) {
+            (true, true, true, true) => Relation::Contains,
+            (false, false, false, false) => {
+                match (
+                    other_vertical_range.contains(self_vertical_range.start()),
+                    other_vertical_range.contains(self_vertical_range.end()),
+                    other_horizontal_range.contains(self_horizontal_range.start()),
+                    other_horizontal_range.contains(self_horizontal_range.end()),
+                ) {
+                    (true, true, true, true) => Relation::Contained,
+                    (false, false, false, false) => Relation::Disjoint,
+                    _ => Relation::Intersects,
+                }
+            }
+            _ => Relation::Intersects,
         }
     }
 }

@@ -59,7 +59,7 @@ fn test_mono_multipolygon_contains_points() {
 
 fn print_geojson(geometry: &Zerometry) -> String {
     geojson::GeoJson::Geometry(geojson::Geometry::new(geojson::Value::from(
-        &geometry.to_geo()
+        &geometry.to_geo(),
     )))
     .to_string_pretty()
     .unwrap()

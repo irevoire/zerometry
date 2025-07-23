@@ -45,7 +45,10 @@ impl<'a> Segment<'a> {
 
     /// Returns true if the segment intersects with the other segment.
     pub fn intersects(&self, other: &Segment) -> bool {
-        geo::intersects::Intersects::intersects(&geo_types::Line::new(self.start.to_geo(), self.end.to_geo()), &geo_types::Line::new(other.start.to_geo(), other.end.to_geo()))
+        geo::intersects::Intersects::intersects(
+            &geo_types::Line::new(self.start.to_geo(), self.end.to_geo()),
+            &geo_types::Line::new(other.start.to_geo(), other.end.to_geo()),
+        )
     }
 }
 
@@ -179,8 +182,18 @@ mod tests {
     fn bug_missing_intersection() {
         // ray: Segment { start: Coord { x: -6.436337296790293, y: 49.63676497357687 }, end: Coord { x: 6.0197316417968105, y: 49.63676497357687 } }
         // segment: Segment { start: Coord { x: 1.188509553443464, y: 49.47027919866874 }, end: Coord { x: 3.6300086390995316, y: 50.610463312569514 } }
-        let ray = Segment::from_slice(&[-6.436337296790293, 49.63676497357687, 6.0197316417968105, 49.63676497357687]);
-        let segment = Segment::from_slice(&[1.188509553443464, 49.47027919866874, 3.6300086390995316, 50.610463312569514]);
+        let ray = Segment::from_slice(&[
+            -6.436337296790293,
+            49.63676497357687,
+            6.0197316417968105,
+            49.63676497357687,
+        ]);
+        let segment = Segment::from_slice(&[
+            1.188509553443464,
+            49.47027919866874,
+            3.6300086390995316,
+            50.610463312569514,
+        ]);
         assert!(segment.intersects(&ray));
     }
 }

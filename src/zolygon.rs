@@ -164,10 +164,14 @@ impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zolygon<'a> {
 impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zolygon<'a> {
     fn relation(&self, other: &Zolygon<'a>) -> Relation {
         if self.is_empty() || other.is_empty() {
+            println!("One of the polygon is empty");
             return Relation::Disjoint;
         } else if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
+            println!("bb disjoint");
             return Relation::Disjoint;
         }
+
+        println!("here");
 
         // To know if two polygons intersect we check if any of the segments of the first polygon intersect with the second polygon.
         // That's O(n^2) but if you know a better algorithm please let me know.
