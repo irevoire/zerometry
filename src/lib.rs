@@ -4,6 +4,7 @@ mod coords;
 mod segment;
 #[cfg(test)]
 mod test;
+mod zine;
 mod zoint;
 mod zolygon;
 mod zulti_points;
@@ -17,6 +18,7 @@ pub(crate) use coord::{COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS};
 pub use coords::Coords;
 use geo_types::{Geometry, MultiPolygon, Polygon};
 pub use segment::Segment;
+use zine::Zine;
 pub use zoint::Zoint;
 pub use zolygon::Zolygon;
 pub use zulti_points::ZultiPoints;
@@ -26,6 +28,7 @@ pub use zulti_polygon::ZultiPolygon;
 pub enum Zerometry<'a> {
     Point(Zoint<'a>),
     MultiPoints(ZultiPoints<'a>),
+    Line(Zine<'a>),
     Polygon(Zolygon<'a>),
     MultiPolygon(ZultiPolygon<'a>),
 }
@@ -133,6 +136,7 @@ impl<'a> Zerometry<'a> {
         match self {
             Zerometry::Point(a) => Geometry::Point(a.to_geo()),
             Zerometry::MultiPoints(a) => Geometry::MultiPoint(a.to_geo()),
+            Zerometry::Line(a) => Geometry::LineString(a.to_geo()),
             Zerometry::Polygon(a) => Geometry::Polygon(a.to_geo()),
             Zerometry::MultiPolygon(a) => Geometry::MultiPolygon(a.to_geo()),
         }
@@ -168,6 +172,7 @@ impl<'a> RelationBetweenShapes<Zoint<'a>> for Zerometry<'a> {
         match self {
             Zerometry::Point(a) => a.relation(other),
             Zerometry::MultiPoints(a) => a.relation(other),
+            Zerometry::Line(a) => a.relation(other),
             Zerometry::Polygon(a) => a.relation(other),
             Zerometry::MultiPolygon(a) => a.relation(other),
         }
@@ -179,6 +184,19 @@ impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zerometry<'a> {
         match self {
             Zerometry::Point(a) => a.relation(other),
             Zerometry::MultiPoints(a) => a.relation(other),
+            Zerometry::Line(a) => a.relation(other),
+            Zerometry::Polygon(a) => a.relation(other),
+            Zerometry::MultiPolygon(a) => a.relation(other),
+        }
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zine<'a>> for Zerometry<'a> {
+    fn relation(&self, other: &Zine) -> Relation {
+        match self {
+            Zerometry::Point(a) => a.relation(other),
+            Zerometry::MultiPoints(a) => a.relation(other),
+            Zerometry::Line(a) => a.relation(other),
             Zerometry::Polygon(a) => a.relation(other),
             Zerometry::MultiPolygon(a) => a.relation(other),
         }
@@ -190,6 +208,7 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zerometry<'a> {
         match self {
             Zerometry::Point(a) => a.relation(other),
             Zerometry::MultiPoints(a) => a.relation(other),
+            Zerometry::Line(a) => a.relation(other),
             Zerometry::Polygon(a) => a.relation(other),
             Zerometry::MultiPolygon(a) => a.relation(other),
         }
@@ -201,6 +220,7 @@ impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for Zerometry<'a> {
         match self {
             Zerometry::Point(a) => a.relation(other),
             Zerometry::MultiPoints(a) => a.relation(other),
+            Zerometry::Line(a) => a.relation(other),
             Zerometry::Polygon(a) => a.relation(other),
             Zerometry::MultiPolygon(a) => a.relation(other),
         }
@@ -212,6 +232,7 @@ impl<'a> RelationBetweenShapes<Zerometry<'a>> for Zerometry<'a> {
         match other {
             Zerometry::Point(a) => self.relation(a),
             Zerometry::MultiPoints(a) => self.relation(a),
+            Zerometry::Line(a) => a.relation(other),
             Zerometry::Polygon(a) => self.relation(a),
             Zerometry::MultiPolygon(a) => self.relation(a),
         }
