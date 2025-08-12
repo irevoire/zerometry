@@ -4,8 +4,8 @@ use std::io::{self, Write};
 use geo_types::MultiPoint;
 
 use crate::{
-    BoundingBox, Coords, Relation, RelationBetweenShapes, Zerometry, Zoint, Zolygon, ZultiPolygon,
-    COORD_SIZE_IN_BYTES,
+    BoundingBox, COORD_SIZE_IN_BYTES, Coords, Relation, RelationBetweenShapes, Zerometry, Zoint,
+    Zolygon, ZultiPolygon,
 };
 
 #[derive(Clone, Copy)]
@@ -48,6 +48,10 @@ impl<'a> ZultiPoints<'a> {
         self.coords.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn coords(&self) -> &'a Coords {
         self.coords
     }
@@ -68,11 +72,7 @@ impl<'a> fmt::Debug for ZultiPoints<'a> {
             .field("bounding_box", &self.bounding_box)
             .field(
                 "points",
-                &self
-                    .coords
-                    .iter()
-                    .map(|c| Zoint::new(c))
-                    .collect::<Vec<_>>(),
+                &self.coords.iter().map(Zoint::new).collect::<Vec<_>>(),
             )
             .finish()
     }
@@ -96,7 +96,7 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiPoints<'a> {
     fn relation(&self, other: &Zolygon<'a>) -> Relation {
         match other.relation(self) {
             Relation::Contains => {
-                debug_assert!(true, "A point cannot contain a polygon");
+                debug_assert!(false, "A point cannot contain a polygon");
                 Relation::Contained
             }
             Relation::Contained => Relation::Contains,

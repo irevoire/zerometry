@@ -18,7 +18,7 @@ impl<'a> Zoint<'a> {
     }
 
     pub fn from_bytes(data: &'a [u8]) -> Self {
-        let coord = Coord::from_bytes(&data);
+        let coord = Coord::from_bytes(data);
         Self::new(coord)
     }
 

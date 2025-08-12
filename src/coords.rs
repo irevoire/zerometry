@@ -2,7 +2,7 @@ use core::fmt;
 
 use bytemuck::cast_slice;
 
-use crate::{Coord, COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS};
+use crate::{COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS, Coord};
 
 #[repr(transparent)]
 pub struct Coords {
@@ -44,7 +44,7 @@ impl<'a> Coords {
     pub fn iter(&self) -> impl Iterator<Item = &Coord> {
         self.data
             .chunks(COORD_SIZE_IN_FLOATS)
-            .map(|chunk| Coord::from_slice(chunk))
+            .map(Coord::from_slice)
     }
 
     pub fn consecutive_pairs(&self) -> impl Iterator<Item = &[f64]> {
@@ -111,7 +111,7 @@ mod tests {
     #[should_panic]
     fn test_coord_panic_on_bad_number_of_floats_from_bytes() {
         let data = [1.0, 2.0, 3.0];
-        Coords::from_bytes(&cast_slice(&data));
+        Coords::from_bytes(cast_slice(&data));
     }
 
     #[test]

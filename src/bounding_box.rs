@@ -7,7 +7,7 @@ use std::{
 
 use geo_types::Point;
 
-use crate::{Coord, Coords, Relation, RelationBetweenShapes, COORD_SIZE_IN_BYTES};
+use crate::{COORD_SIZE_IN_BYTES, Coord, Coords, Relation, RelationBetweenShapes};
 
 pub(crate) const BOUNDING_BOX_SIZE_IN_BYTES: usize = COORD_SIZE_IN_BYTES * 2;
 
@@ -209,7 +209,7 @@ mod tests {
     #[test]
     fn test_bounding_box_from_bytes() {
         let data = [1.0, 2.0, 3.0, 4.0];
-        let bb = BoundingBox::from_bytes(&cast_slice(&data));
+        let bb = BoundingBox::from_bytes(cast_slice(&data));
         insta::assert_debug_snapshot!(bb, @r"
         BoundingBox {
             bottom_left: Coord {
@@ -228,21 +228,21 @@ mod tests {
     #[should_panic]
     fn test_bounding_box_from_bytes_panic_on_missing_point_bytes() {
         let data = [1.0, 2.0];
-        BoundingBox::from_bytes(&cast_slice(&data));
+        BoundingBox::from_bytes(cast_slice(&data));
     }
 
     #[test]
     #[should_panic]
     fn test_bounding_box_from_bytes_panic_on_too_many_point_bytes() {
         let data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
-        BoundingBox::from_bytes(&cast_slice(&data));
+        BoundingBox::from_bytes(cast_slice(&data));
     }
 
     #[test]
     #[should_panic]
     fn test_bounding_box_from_bytes_panic_on_too_long_bytes() {
         let data = [1.0, 2.0, 3.0, 4.0, 5.0];
-        BoundingBox::from_bytes(&cast_slice(&data));
+        BoundingBox::from_bytes(cast_slice(&data));
     }
 
     #[test]
@@ -294,8 +294,8 @@ mod tests {
     #[test]
     fn test_bounding_box_contains_coord() {
         let bb = BoundingBox::from_slice(&[1.0, 2.0, 3.0, 4.0]);
-        assert!(bb.contains_coord(&Coord::from_slice(&[2.0, 3.0])));
-        assert!(!bb.contains_coord(&Coord::from_slice(&[0.0, 0.0])));
+        assert!(bb.contains_coord(Coord::from_slice(&[2.0, 3.0])));
+        assert!(!bb.contains_coord(Coord::from_slice(&[0.0, 0.0])));
     }
 
     #[test]

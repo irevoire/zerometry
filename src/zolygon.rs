@@ -4,8 +4,8 @@ use std::io::{self, Write};
 use geo_types::{Geometry, Polygon};
 
 use crate::{
-    BoundingBox, Coord, Coords, Relation, RelationBetweenShapes, Segment, Zerometry, Zoint,
-    ZultiPoints, ZultiPolygon, COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS,
+    BoundingBox, COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS, Coord, Coords, Relation,
+    RelationBetweenShapes, Segment, Zerometry, Zoint, ZultiPoints, ZultiPolygon,
 };
 
 /// A polygon is a closed shape defined by a list of coordinates.
@@ -32,8 +32,7 @@ impl<'a> Zolygon<'a> {
     pub fn from_bytes(data: &'a [u8]) -> Self {
         debug_assert!(
             data.len() % COORD_SIZE_IN_FLOATS == 0,
-            "Data length must be a multiple of {}",
-            COORD_SIZE_IN_FLOATS
+            "Data length must be a multiple of {COORD_SIZE_IN_FLOATS}"
         );
         debug_assert!(
             data.len() >= COORD_SIZE_IN_FLOATS * 2,
@@ -41,8 +40,7 @@ impl<'a> Zolygon<'a> {
         );
         debug_assert!(
             data.as_ptr() as usize % COORD_SIZE_IN_FLOATS == 0,
-            "Data must be aligned to {}",
-            COORD_SIZE_IN_FLOATS
+            "Data must be aligned to {COORD_SIZE_IN_FLOATS}"
         );
         let bounding_box = BoundingBox::from_bytes(&data[0..COORD_SIZE_IN_BYTES * 2]);
         let coords = Coords::from_bytes(&data[COORD_SIZE_IN_BYTES * 2..]);
@@ -72,9 +70,7 @@ impl<'a> Zolygon<'a> {
     }
 
     pub fn segments(&self) -> impl Iterator<Item = Segment<'a>> {
-        self.coords
-            .consecutive_pairs()
-            .map(|chunk| Segment::from_slice(chunk))
+        self.coords.consecutive_pairs().map(Segment::from_slice)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -163,6 +159,7 @@ impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zolygon<'a> {
 
 impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zolygon<'a> {
     fn relation(&self, other: &Zolygon<'a>) -> Relation {
+        #[allow(clippy::if_same_then_else)] // readability
         if self.is_empty() || other.is_empty() {
             return Relation::Disjoint;
         } else if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {

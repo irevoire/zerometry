@@ -70,7 +70,7 @@ mod tests {
     #[test]
     fn test_segment_from_bytes() {
         let data = [1.0, 2.0, 3.0, 4.0];
-        let bb = Segment::from_bytes(&cast_slice(&data));
+        let bb = Segment::from_bytes(cast_slice(&data));
         insta::assert_debug_snapshot!(bb, @r"
         Segment {
             start: Coord {
@@ -89,21 +89,21 @@ mod tests {
     #[should_panic]
     fn test_segment_from_bytes_panic_on_missing_point_bytes() {
         let data = [1.0, 2.0];
-        Segment::from_bytes(&cast_slice(&data));
+        Segment::from_bytes(cast_slice(&data));
     }
 
     #[test]
     #[should_panic]
     fn test_segment_from_bytes_panic_on_too_many_point_bytes() {
         let data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
-        Segment::from_bytes(&cast_slice(&data));
+        Segment::from_bytes(cast_slice(&data));
     }
 
     #[test]
     #[should_panic]
     fn test_segment_from_bytes_panic_on_too_long_bytes() {
         let data = [1.0, 2.0, 3.0, 4.0, 5.0];
-        Segment::from_bytes(&cast_slice(&data));
+        Segment::from_bytes(cast_slice(&data));
     }
 
     #[test]

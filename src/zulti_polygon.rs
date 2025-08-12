@@ -4,8 +4,8 @@ use bytemuck::cast_slice;
 use geo_types::{MultiPolygon, Point};
 
 use crate::{
-    bounding_box::BOUNDING_BOX_SIZE_IN_BYTES, BoundingBox, Relation, RelationBetweenShapes,
-    Zerometry, Zoint, Zolygon, ZultiPoints,
+    BoundingBox, Relation, RelationBetweenShapes, Zerometry, Zoint, Zolygon, ZultiPoints,
+    bounding_box::BOUNDING_BOX_SIZE_IN_BYTES,
 };
 
 #[derive(Clone, Copy)]
@@ -73,7 +73,10 @@ impl<'a> ZultiPolygon<'a> {
         writer.extend((geometry.0.len() as u32).to_ne_bytes());
         let offsets_addr = writer.len();
         // We must leave an empty space to write the offsets later
-        writer.extend(std::iter::repeat(0).take(geometry.0.len() * mem::size_of::<u32>()));
+        writer.extend(std::iter::repeat_n(
+            0,
+            geometry.0.len() * mem::size_of::<u32>(),
+        ));
         if geometry.0.len() % 2 == 0 {
             // If we have an even number of polygons, we must add an extra offset at the end for padding
             writer.extend(0_u32.to_ne_bytes());
@@ -82,7 +85,7 @@ impl<'a> ZultiPolygon<'a> {
         let mut offsets = Vec::new();
         for polygon in geometry.iter() {
             offsets.push(writer.len() as u32 - start as u32);
-            Zolygon::write_from_geometry(writer, &polygon)?;
+            Zolygon::write_from_geometry(writer, polygon)?;
         }
 
         for (i, offset) in offsets.iter().enumerate() {
@@ -109,6 +112,10 @@ impl<'a> ZultiPolygon<'a> {
 
     pub fn len(&self) -> usize {
         self.offsets.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     pub fn polygons(&'a self) -> impl Iterator<Item = Zolygon<'a>> {
@@ -139,16 +146,15 @@ impl<'a> fmt::Debug for ZultiPolygon<'a> {
 
 impl<'a> RelationBetweenShapes<Zoint<'a>> for ZultiPolygon<'a> {
     fn relation(&self, other: &Zoint) -> Relation {
-        if self.len() == 0 {
+        if self.is_empty() {
             return Relation::Disjoint;
         }
-        if !self.bounding_box().contains_coord(&other.coord()) {
+        if !self.bounding_box().contains_coord(other.coord()) {
             return Relation::Disjoint;
         }
         for zolygon in self.polygons() {
-            match zolygon.relation(other) {
-                Relation::Contains => return Relation::Contains,
-                _ => {}
+            if zolygon.relation(other) == Relation::Contains {
+                return Relation::Contains;
             }
         }
         Relation::Disjoint
@@ -157,16 +163,15 @@ impl<'a> RelationBetweenShapes<Zoint<'a>> for ZultiPolygon<'a> {
 
 impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for ZultiPolygon<'a> {
     fn relation(&self, other: &ZultiPoints) -> Relation {
-        if self.len() == 0 || other.len() == 0 {
+        if self.is_empty() || other.is_empty() {
             return Relation::Disjoint;
         }
         if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
             return Relation::Disjoint;
         }
         for zolygon in self.polygons() {
-            match zolygon.relation(other) {
-                Relation::Contains => return Relation::Contains,
-                _ => {}
+            if zolygon.relation(other) == Relation::Contains {
+                return Relation::Contains;
             }
         }
         Relation::Disjoint
@@ -175,7 +180,7 @@ impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for ZultiPolygon<'a> {
 
 impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiPolygon<'a> {
     fn relation(&self, other: &Zolygon) -> Relation {
-        if self.len() == 0 || other.is_empty() {
+        if self.is_empty() || other.is_empty() {
             return Relation::Disjoint;
         }
         if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
@@ -200,7 +205,7 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiPolygon<'a> {
 
 impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for ZultiPolygon<'a> {
     fn relation(&self, other: &ZultiPolygon) -> Relation {
-        if self.len() == 0 || other.len() == 0 {
+        if self.is_empty() || other.is_empty() {
             return Relation::Disjoint;
         }
         if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {

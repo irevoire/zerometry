@@ -4,7 +4,7 @@ use crate::{Coord, Relation, RelationBetweenShapes, Zerometry, Zoint};
 fn test_mono_multipolygon_contains_points() {
     // This test highlights a bug I found on cellulite where a point was considered contained in an h3 cell even though it clearly is not.
     let buffer = [6.0197316417968105, 49.63676497357687];
-    let point = Zoint::new(&Coord::from_slice(&buffer));
+    let point = Zoint::new(Coord::from_slice(&buffer));
     println!("point: {}", print_geojson(&point.into()));
 
     let wrong_multipolygon = geo_types::MultiPolygon::new(vec![geo_types::Polygon::new(

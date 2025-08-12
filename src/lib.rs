@@ -103,28 +103,28 @@ impl<'a> Zerometry<'a> {
 
     pub fn to_point(&self) -> Option<Zoint> {
         match self {
-            Zerometry::Point(a) => Some(a.clone()),
+            Zerometry::Point(a) => Some(*a),
             _ => None,
         }
     }
 
     pub fn to_multi_points(&self) -> Option<ZultiPoints> {
         match self {
-            Zerometry::MultiPoints(a) => Some(a.clone()),
+            Zerometry::MultiPoints(a) => Some(*a),
             _ => None,
         }
     }
 
     pub fn to_polygon(&self) -> Option<Zolygon> {
         match self {
-            Zerometry::Polygon(a) => Some(a.clone()),
+            Zerometry::Polygon(a) => Some(*a),
             _ => None,
         }
     }
 
     pub fn to_multi_polygon(&self) -> Option<ZultiPolygon> {
         match self {
-            Zerometry::MultiPolygon(a) => Some(a.clone()),
+            Zerometry::MultiPolygon(a) => Some(*a),
             _ => None,
         }
     }
