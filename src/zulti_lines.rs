@@ -254,6 +254,14 @@ impl<'a> RelationBetweenShapes<Zerometry<'a>> for ZultiLines<'a> {
     }
 }
 
+impl PartialEq<MultiLineString> for ZultiLines<'_> {
+    fn eq(&self, other: &MultiLineString) -> bool {
+        self.lines()
+            .zip(other.0.iter())
+            .all(|(zine, line)| zine.eq(line))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use geo::LineString;

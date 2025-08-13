@@ -256,6 +256,14 @@ impl<'a> RelationBetweenShapes<Zerometry<'a>> for ZultiPolygon<'a> {
     }
 }
 
+impl PartialEq<MultiPolygon> for ZultiPolygon<'_> {
+    fn eq(&self, other: &MultiPolygon) -> bool {
+        self.polygons()
+            .zip(other.0.iter())
+            .all(|(zolygon, polygon)| zolygon.eq(polygon))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use geo_types::{LineString, Polygon};

@@ -17,6 +17,7 @@ pub use bounding_box::BoundingBox;
 pub use coord::Coord;
 pub(crate) use coord::{COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS};
 pub use coords::Coords;
+use geo::LineString;
 use geo_types::{Geometry, MultiPolygon, Polygon};
 pub use segment::Segment;
 pub use zine::Zine;
@@ -73,6 +74,9 @@ impl<'a> Zerometry<'a> {
             1 => Ok(Zerometry::MultiPoints(ZultiPoints::from_bytes(data))),
             2 => Ok(Zerometry::Polygon(Zolygon::from_bytes(data))),
             3 => Ok(Zerometry::MultiPolygon(ZultiPolygon::from_bytes(data))),
+            // They're located after because it would be a db-breaking to edit the already existing tags
+            4 => Ok(Zerometry::Line(Zine::from_bytes(data))),
+            5 => Ok(Zerometry::MultiLines(ZultiLines::from_bytes(data))),
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Invalid zerometry tag",
@@ -80,6 +84,7 @@ impl<'a> Zerometry<'a> {
         }
     }
 
+    /// The Line, Triangle and Rectangle gets converted respectively to Zine and Zolygon
     pub fn write_from_geometry(
         writer: &mut Vec<u8>,
         geometry: &Geometry<f64>,
@@ -102,7 +107,26 @@ impl<'a> Zerometry<'a> {
                 writer.extend_from_slice(&3_u64.to_ne_bytes());
                 ZultiPolygon::write_from_geometry(writer, multi_polygon)?;
             }
-            _ => todo!(),
+            Geometry::LineString(line_string) => {
+                writer.extend_from_slice(&4_u64.to_ne_bytes());
+                Zine::write_from_geometry(writer, line_string)?;
+            }
+            Geometry::MultiLineString(multi_line_string) => {
+                writer.extend_from_slice(&5_u64.to_ne_bytes());
+                ZultiLines::write_from_geometry(writer, multi_line_string)?;
+            }
+            Geometry::GeometryCollection(_geometry_collection) => todo!(),
+            // Should never happens since we're working with geogson in meilisearch
+            Geometry::Line(line) => {
+                let line = LineString::new(vec![line.start, line.end]);
+                Self::write_from_geometry(writer, &line.into())?;
+            }
+            Geometry::Rect(rect) => {
+                Self::write_from_geometry(writer, &rect.to_polygon().into())?;
+            }
+            Geometry::Triangle(triangle) => {
+                Self::write_from_geometry(writer, &triangle.to_polygon().into())?;
+            }
         }
         Ok(())
     }
@@ -310,5 +334,201 @@ impl<'a> RelationBetweenShapes<MultiPolygon<f64>> for Zerometry<'a> {
             .unwrap();
         let other = Zerometry::from_bytes(&buffer).unwrap();
         self.relation(&other)
+    }
+}
+
+impl PartialEq<Geometry> for Zerometry<'_> {
+    fn eq(&self, other: &Geometry) -> bool {
+        match (self, other) {
+            (Zerometry::Point(zoint), Geometry::Point(point)) => zoint.eq(point),
+            (Zerometry::MultiPoints(zulti_points), Geometry::MultiPoint(multi_point)) => {
+                zulti_points.eq(multi_point)
+            }
+            (Zerometry::Line(zine), Geometry::LineString(line_string)) => zine.eq(line_string),
+            (Zerometry::MultiLines(zulti_lines), Geometry::MultiLineString(multi_line_string)) => {
+                zulti_lines.eq(multi_line_string)
+            }
+            (Zerometry::Polygon(zolygon), Geometry::Polygon(polygon)) => zolygon.eq(polygon),
+            (Zerometry::MultiPolygon(zulti_polygon), Geometry::MultiPolygon(multi_polygon)) => {
+                zulti_polygon.eq(multi_polygon)
+            }
+            _ => false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod zerometry_test {
+    use geo_types::geometry;
+
+    use crate::Zerometry;
+
+    #[test]
+    fn naive_point_roundtrip() {
+        let point = geometry::Geometry::Point(geometry::Point::new(45.0, 65.0));
+        let mut buf = Vec::new();
+        Zerometry::write_from_geometry(&mut buf, &point).unwrap();
+        let zoint = Zerometry::from_bytes(&buf).unwrap();
+        assert_eq!(zoint, point);
+    }
+
+    #[test]
+    fn naive_multi_point_roundtrip() {
+        let multi_point = geometry::Geometry::MultiPoint(geometry::MultiPoint::new(vec![]));
+        let mut buf = Vec::new();
+        Zerometry::write_from_geometry(&mut buf, &multi_point).unwrap();
+        let zulti_point = Zerometry::from_bytes(&buf).unwrap();
+        assert_eq!(zulti_point, multi_point);
+
+        let multi_point = geometry::Geometry::MultiPoint(geometry::MultiPoint::new(vec![
+            geometry::Point::new(45.0, 65.0),
+            geometry::Point::new(46.0, 66.0),
+            geometry::Point::new(44.0, 64.0),
+            geometry::Point::new(45.0, 65.0),
+        ]));
+        let mut buf = Vec::new();
+        Zerometry::write_from_geometry(&mut buf, &multi_point).unwrap();
+        let zulti_point = Zerometry::from_bytes(&buf).unwrap();
+        assert_eq!(zulti_point, multi_point);
+    }
+
+    #[test]
+    fn naive_line_string_roundtrip() {
+        let line_string = geometry::Geometry::LineString(geometry::LineString::new(vec![]));
+        let mut buf = Vec::new();
+        Zerometry::write_from_geometry(&mut buf, &line_string).unwrap();
+        let zine_string = Zerometry::from_bytes(&buf).unwrap();
+        assert_eq!(zine_string, line_string);
+
+        let line_string = geometry::Geometry::LineString(geometry::LineString::new(vec![
+            geometry::Coord { x: 45.0, y: 25.0 },
+            geometry::Coord { x: 46.0, y: 24.0 },
+            geometry::Coord { x: 45.0, y: 25.0 },
+        ]));
+        let mut buf = Vec::new();
+        Zerometry::write_from_geometry(&mut buf, &line_string).unwrap();
+        let zine_string = Zerometry::from_bytes(&buf).unwrap();
+        assert_eq!(zine_string, line_string);
+    }
+
+    #[test]
+    fn naive_multi_line_string_roundtrip() {
+        let multi_line_string =
+            geometry::Geometry::MultiLineString(geometry::MultiLineString::new(vec![]));
+        let mut buf = Vec::new();
+        Zerometry::write_from_geometry(&mut buf, &multi_line_string).unwrap();
+        let zulti_line_string = Zerometry::from_bytes(&buf).unwrap();
+        assert_eq!(zulti_line_string, multi_line_string);
+
+        let multi_line_string =
+            geometry::Geometry::MultiLineString(geometry::MultiLineString::new(vec![
+                geometry::LineString::new(vec![
+                    geometry::Coord { x: 45.0, y: 25.0 },
+                    geometry::Coord { x: 46.0, y: 24.0 },
+                    geometry::Coord { x: 45.0, y: 25.0 },
+                ]),
+                geometry::LineString::new(vec![]),
+                geometry::LineString::new(vec![
+                    geometry::Coord { x: 66.0, y: 46.0 },
+                    geometry::Coord { x: 47.0, y: 34.0 },
+                    geometry::Coord { x: 66.0, y: 26.0 },
+                ]),
+            ]));
+        let mut buf = Vec::new();
+        Zerometry::write_from_geometry(&mut buf, &multi_line_string).unwrap();
+        let zulti_line_string = Zerometry::from_bytes(&buf).unwrap();
+        assert_eq!(zulti_line_string, multi_line_string);
+
+        let multi_line_string =
+            geometry::Geometry::MultiLineString(geometry::MultiLineString::new(vec![
+                geometry::LineString::new(vec![
+                    geometry::Coord { x: 45.0, y: 25.0 },
+                    geometry::Coord { x: 46.0, y: 24.0 },
+                    geometry::Coord { x: 45.0, y: 25.0 },
+                ]),
+                geometry::LineString::new(vec![
+                    geometry::Coord { x: 55.0, y: 25.0 },
+                    geometry::Coord { x: 46.0, y: 34.0 },
+                    geometry::Coord { x: 55.0, y: 25.0 },
+                ]),
+                geometry::LineString::new(vec![
+                    geometry::Coord { x: 66.0, y: 46.0 },
+                    geometry::Coord { x: 47.0, y: 34.0 },
+                    geometry::Coord { x: 66.0, y: 26.0 },
+                ]),
+            ]));
+        let mut buf = Vec::new();
+        Zerometry::write_from_geometry(&mut buf, &multi_line_string).unwrap();
+        let zulti_line_string = Zerometry::from_bytes(&buf).unwrap();
+        assert_eq!(zulti_line_string, multi_line_string);
+    }
+
+    #[test]
+    fn naive_polygon_roundtrip() {
+        let polygon = geometry::Geometry::Polygon(geometry::Polygon::new(
+            geometry::LineString::new(vec![]),
+            vec![],
+        ));
+        let mut buf = Vec::new();
+        Zerometry::write_from_geometry(&mut buf, &polygon).unwrap();
+        let zolygon = Zerometry::from_bytes(&buf).unwrap();
+        assert_eq!(zolygon, polygon);
+
+        let polygon = geometry::Geometry::Polygon(geometry::Polygon::new(
+            geometry::LineString::new(vec![
+                geometry::Coord { x: 66.0, y: 46.0 },
+                geometry::Coord { x: 47.0, y: 34.0 },
+                geometry::Coord { x: 66.0, y: 26.0 },
+            ]),
+            vec![],
+        ));
+        let mut buf = Vec::new();
+        Zerometry::write_from_geometry(&mut buf, &polygon).unwrap();
+        let zolygon = Zerometry::from_bytes(&buf).unwrap();
+        assert_eq!(zolygon, polygon);
+    }
+
+    #[test]
+    fn naive_multi_polygon_roundtrip() {
+        let multi_polygon = geometry::Geometry::MultiPolygon(geometry::MultiPolygon::new(vec![]));
+        let mut buf = Vec::new();
+        Zerometry::write_from_geometry(&mut buf, &multi_polygon).unwrap();
+        let zulti_polygon = Zerometry::from_bytes(&buf).unwrap();
+        assert_eq!(zulti_polygon, multi_polygon);
+
+        let multi_polygon = geometry::Geometry::MultiPolygon(geometry::MultiPolygon::new(vec![
+            geometry::Polygon::new(
+                geometry::LineString::new(vec![
+                    geometry::Coord { x: 66.0, y: 46.0 },
+                    geometry::Coord { x: 47.0, y: 34.0 },
+                    geometry::Coord { x: 66.0, y: 26.0 },
+                ]),
+                vec![],
+            ),
+            geometry::Polygon::new(
+                geometry::LineString::new(vec![
+                    geometry::Coord { x: 86.0, y: 48.0 },
+                    geometry::Coord { x: 67.0, y: 36.0 },
+                    geometry::Coord { x: 86.0, y: 28.0 },
+                ]),
+                vec![],
+            ),
+        ]));
+        let mut buf = Vec::new();
+        Zerometry::write_from_geometry(&mut buf, &multi_polygon).unwrap();
+        let zulti_polygon = Zerometry::from_bytes(&buf).unwrap();
+        assert_eq!(zulti_polygon, multi_polygon);
+    }
+
+    #[test]
+    fn naive_geometry_collection_roundtrip() {
+        /*
+        let geometry_collection =
+            geometry::Geometry::GeometryCollection(geometry::GeometryCollection::new_from(todo!()));
+        let mut buf = Vec::new();
+        Zerometry::write_from_geometry(&mut buf, &geometry_collection).unwrap();
+        let zeometry_collection = Zerometry::from_bytes(&buf).unwrap();
+        assert_eq!(zeometry_collection, geometry_collection);
+        */
     }
 }
