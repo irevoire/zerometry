@@ -5,7 +5,8 @@ use geo_types::{Geometry, Polygon};
 
 use crate::{
     BoundingBox, COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS, Coord, Coords, Relation,
-    RelationBetweenShapes, Segment, Zerometry, Zoint, ZultiPoints, ZultiPolygon, zine::Zine,
+    RelationBetweenShapes, Segment, Zerometry, Zoint, ZultiLines, ZultiPoints, ZultiPolygon,
+    zine::Zine,
 };
 
 /// A polygon is a closed shape defined by a list of coordinates.
@@ -159,6 +160,15 @@ impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zolygon<'a> {
 
 impl<'a> RelationBetweenShapes<Zine<'a>> for Zolygon<'a> {
     fn relation(&self, other: &Zine<'a>) -> Relation {
+        match other.relation(self) {
+            Relation::Contained => Relation::Contains,
+            other => other,
+        }
+    }
+}
+
+impl<'a> RelationBetweenShapes<ZultiLines<'a>> for Zolygon<'a> {
+    fn relation(&self, other: &ZultiLines<'a>) -> Relation {
         match other.relation(self) {
             Relation::Contained => Relation::Contains,
             other => other,

@@ -5,7 +5,7 @@ use geo::{LineString, Point};
 
 use crate::{
     BoundingBox, COORD_SIZE_IN_BYTES, Coords, Relation, RelationBetweenShapes, Segment, Zerometry,
-    Zoint, Zolygon, ZultiPoints, ZultiPolygon,
+    Zoint, Zolygon, ZultiPoints, ZultiPolygon, zulti_lines::ZultiLines,
 };
 
 #[derive(Clone, Copy)]
@@ -88,6 +88,20 @@ impl<'a> fmt::Debug for Zine<'a> {
     }
 }
 
+// A point cannot contains or intersect with anything
+impl<'a> RelationBetweenShapes<Zoint<'a>> for Zine<'a> {
+    fn relation(&self, _other: &Zoint<'a>) -> Relation {
+        Relation::Disjoint
+    }
+}
+
+// A point cannot contains or intersect with anything
+impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zine<'a> {
+    fn relation(&self, _other: &ZultiPoints<'a>) -> Relation {
+        Relation::Disjoint
+    }
+}
+
 impl<'a> RelationBetweenShapes<Zine<'a>> for Zine<'a> {
     fn relation(&self, other: &Zine<'a>) -> Relation {
         if self.is_empty()
@@ -109,17 +123,10 @@ impl<'a> RelationBetweenShapes<Zine<'a>> for Zine<'a> {
     }
 }
 
-// A point cannot contains or intersect with anything
-impl<'a> RelationBetweenShapes<Zoint<'a>> for Zine<'a> {
-    fn relation(&self, _other: &Zoint<'a>) -> Relation {
-        Relation::Disjoint
-    }
-}
-
-// A point cannot contains or intersect with anything
-impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zine<'a> {
-    fn relation(&self, _other: &ZultiPoints<'a>) -> Relation {
-        Relation::Disjoint
+impl<'a> RelationBetweenShapes<ZultiLines<'a>> for Zine<'a> {
+    fn relation(&self, other: &ZultiLines<'a>) -> Relation {
+        // no need to revert the contains/contained as this connot happens with lines
+        other.relation(self)
     }
 }
 
@@ -181,6 +188,7 @@ impl<'a> RelationBetweenShapes<Zerometry<'a>> for Zine<'a> {
             Zerometry::Point(zoint) => self.relation(zoint),
             Zerometry::MultiPoints(zulti_points) => self.relation(zulti_points),
             Zerometry::Line(zine) => self.relation(zine),
+            Zerometry::MultiLines(zulti_lines) => self.relation(zulti_lines),
             Zerometry::Polygon(zolygon) => self.relation(zolygon),
             Zerometry::MultiPolygon(zulti_polygon) => self.relation(zulti_polygon),
         }

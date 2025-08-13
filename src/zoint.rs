@@ -5,7 +5,7 @@ use geo_types::Point;
 
 use crate::{
     Coord, Relation, RelationBetweenShapes, Zerometry, Zolygon, ZultiPoints, ZultiPolygon,
-    zine::Zine,
+    zine::Zine, zulti_lines::ZultiLines,
 };
 
 #[derive(Clone, Copy)]
@@ -87,6 +87,13 @@ impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zoint<'a> {
 // A point cannot contains or intersect with a line
 impl<'a> RelationBetweenShapes<Zine<'a>> for Zoint<'a> {
     fn relation(&self, _other: &Zine<'a>) -> Relation {
+        Relation::Disjoint
+    }
+}
+
+// A point cannot contains or intersect with a line
+impl<'a> RelationBetweenShapes<ZultiLines<'a>> for Zoint<'a> {
+    fn relation(&self, _other: &ZultiLines<'a>) -> Relation {
         Relation::Disjoint
     }
 }

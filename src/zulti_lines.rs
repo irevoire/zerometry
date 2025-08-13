@@ -1,24 +1,24 @@
 use std::{fmt, io, mem};
 
 use bytemuck::cast_slice;
-use geo_types::{MultiPolygon, Point};
+use geo_types::{MultiLineString, Point};
 
 use crate::{
-    BoundingBox, Relation, RelationBetweenShapes, Zerometry, Zoint, Zolygon, ZultiLines,
-    ZultiPoints, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES, zine::Zine,
+    BoundingBox, Relation, RelationBetweenShapes, Zerometry, Zoint, Zolygon, ZultiPoints,
+    ZultiPolygon, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES, zine::Zine,
 };
 
 #[derive(Clone, Copy)]
-pub struct ZultiPolygon<'a> {
+pub struct ZultiLines<'a> {
     bounding_box: &'a BoundingBox,
     // In the binary format we store the number of offsets here
-    // If it's 0, it means that the polygon is empty
+    // If it's 0, it means that the multi lines is empty
     // If it's odd it means we also inserted one extra offset at the end for padding that should not ends up in the slice
     offsets: &'a [u32],
     bytes: &'a [u8],
 }
 
-impl<'a> ZultiPolygon<'a> {
+impl<'a> ZultiLines<'a> {
     pub fn new(bounding_box: &'a BoundingBox, offsets: &'a [u32], bytes: &'a [u8]) -> Self {
         Self {
             bounding_box,
@@ -41,14 +41,14 @@ impl<'a> ZultiPolygon<'a> {
         let offsets = &data[..size_of_offsets];
         let offsets: &[u32] = cast_slice(offsets);
         let data = &data[size_of_offsets..];
-        // 2.3 If we have an even number of offsets, there is one u32 of padding at the end that we must skip before retrieving coords of the polygons
+        // 2.3 If we have an even number of offsets, there is one u32 of padding at the end that we must skip before retrieving coords of the lines
         let data = if offsets_count % 2 == 0 {
             debug_assert_eq!(data[0..mem::size_of::<u32>()], [0, 0, 0, 0]);
             &data[mem::size_of::<u32>()..]
         } else {
             data
         };
-        // 3. Finally retrieve the polygons
+        // 3. Finally retrieve the lines
         let bytes = data;
 
         Self {
@@ -60,13 +60,14 @@ impl<'a> ZultiPolygon<'a> {
 
     pub fn write_from_geometry(
         writer: &mut Vec<u8>,
-        geometry: &MultiPolygon<f64>,
+        geometry: &MultiLineString<f64>,
     ) -> Result<(), io::Error> {
         BoundingBox::write_from_geometry(
             writer,
             geometry
+                .0
                 .iter()
-                .flat_map(|polygon| polygon.exterior().0.iter())
+                .flat_map(|line| line.0.iter())
                 .map(|coord| Point::from((coord.x, coord.y))),
         )?;
         // Write the number of offsets to expect
@@ -78,14 +79,14 @@ impl<'a> ZultiPolygon<'a> {
             geometry.0.len() * mem::size_of::<u32>(),
         ));
         if geometry.0.len() % 2 == 0 {
-            // If we have an even number of polygons, we must add an extra offset at the end for padding
+            // If we have an even number of lines, we must add an extra offset at the end for padding
             writer.extend(0_u32.to_ne_bytes());
         }
         let start = writer.len();
         let mut offsets = Vec::new();
-        for polygon in geometry.iter() {
+        for line in geometry.iter() {
             offsets.push(writer.len() as u32 - start as u32);
-            Zolygon::write_from_geometry(writer, polygon)?;
+            Zine::write_from_geometry(writer, line)?;
         }
 
         for (i, offset) in offsets.iter().enumerate() {
@@ -100,14 +101,14 @@ impl<'a> ZultiPolygon<'a> {
         self.bounding_box
     }
 
-    pub fn get(&self, index: usize) -> Option<Zolygon<'a>> {
+    pub fn get(&self, index: usize) -> Option<Zine<'a>> {
         let offset = *self.offsets.get(index)?;
         let next_offset = *self
             .offsets
             .get(index + 1)
             .unwrap_or(&(self.bytes.len() as u32));
         let bytes = &self.bytes[offset as usize..next_offset as usize];
-        Some(Zolygon::from_bytes(bytes))
+        Some(Zine::from_bytes(bytes))
     }
 
     pub fn len(&self) -> usize {
@@ -118,85 +119,86 @@ impl<'a> ZultiPolygon<'a> {
         self.len() == 0
     }
 
-    pub fn polygons(&'a self) -> impl Iterator<Item = Zolygon<'a>> {
+    pub fn lines(&'a self) -> impl Iterator<Item = Zine<'a>> {
         (0..self.len()).map(move |index| self.get(index).unwrap())
     }
 
-    pub fn to_geo(&self) -> geo_types::MultiPolygon<f64> {
-        geo_types::MultiPolygon::new(self.polygons().map(|zolygon| zolygon.to_geo()).collect())
+    pub fn to_geo(&self) -> geo_types::MultiLineString<f64> {
+        geo_types::MultiLineString::new(self.lines().map(|zine| zine.to_geo()).collect())
     }
 }
 
-impl<'a> fmt::Debug for ZultiPolygon<'a> {
+impl<'a> fmt::Debug for ZultiLines<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        struct ZolygonsDebug<'b, 'a>(&'b ZultiPolygon<'a>);
+        struct ZinesDebug<'b, 'a>(&'b ZultiLines<'a>);
 
-        impl<'b, 'a> fmt::Debug for ZolygonsDebug<'b, 'a> {
+        impl<'b, 'a> fmt::Debug for ZinesDebug<'b, 'a> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.debug_list().entries(self.0.polygons()).finish()
+                f.debug_list().entries(self.0.lines()).finish()
             }
         }
 
-        f.debug_struct("ZultiPolygon")
+        f.debug_struct("ZultiLines")
             .field("bounding_box", &self.bounding_box())
-            .field("zolygons", &ZolygonsDebug(self))
+            .field("zines", &ZinesDebug(self))
             .finish()
     }
 }
 
-impl<'a> RelationBetweenShapes<Zoint<'a>> for ZultiPolygon<'a> {
-    fn relation(&self, other: &Zoint) -> Relation {
-        if self.is_empty() {
-            return Relation::Disjoint;
-        }
-        if !self.bounding_box().contains_coord(other.coord()) {
-            return Relation::Disjoint;
-        }
-        for zolygon in self.polygons() {
-            if zolygon.relation(other) == Relation::Contains {
-                return Relation::Contains;
-            }
-        }
+// points and line have nothing in common
+impl<'a> RelationBetweenShapes<Zoint<'a>> for ZultiLines<'a> {
+    fn relation(&self, _other: &Zoint) -> Relation {
         Relation::Disjoint
     }
 }
 
-impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for ZultiPolygon<'a> {
-    fn relation(&self, other: &ZultiPoints) -> Relation {
-        if self.is_empty() || other.is_empty() {
-            return Relation::Disjoint;
-        }
-        if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
-            return Relation::Disjoint;
-        }
-        for zolygon in self.polygons() {
-            if zolygon.relation(other) == Relation::Contains {
-                return Relation::Contains;
-            }
-        }
+impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for ZultiLines<'a> {
+    fn relation(&self, _other: &ZultiPoints) -> Relation {
         Relation::Disjoint
     }
 }
 
-impl<'a> RelationBetweenShapes<Zine<'a>> for ZultiPolygon<'a> {
+impl<'a> RelationBetweenShapes<Zine<'a>> for ZultiLines<'a> {
     fn relation(&self, other: &Zine) -> Relation {
-        match other.relation(self) {
-            Relation::Contained => Relation::Contains,
-            other => other,
+        if self.is_empty()
+            || other.is_empty()
+            || self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint
+        {
+            return Relation::Disjoint;
         }
+
+        for line in self.lines() {
+            if line.relation(other) == Relation::Intersects {
+                return Relation::Intersects;
+            }
+        }
+
+        Relation::Disjoint
     }
 }
 
-impl<'a> RelationBetweenShapes<ZultiLines<'a>> for ZultiPolygon<'a> {
-    fn relation(&self, other: &ZultiLines<'a>) -> Relation {
-        match other.relation(self) {
-            Relation::Contained => Relation::Contains,
-            other => other,
+impl<'a> RelationBetweenShapes<ZultiLines<'a>> for ZultiLines<'a> {
+    fn relation(&self, other: &ZultiLines) -> Relation {
+        if self.is_empty()
+            || other.is_empty()
+            || self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint
+        {
+            return Relation::Disjoint;
         }
+
+        for left in self.lines() {
+            for right in other.lines() {
+                if left.relation(&right) == Relation::Intersects {
+                    return Relation::Intersects;
+                }
+            }
+        }
+
+        Relation::Disjoint
     }
 }
 
-impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiPolygon<'a> {
+impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiLines<'a> {
     fn relation(&self, other: &Zolygon) -> Relation {
         if self.is_empty() || other.is_empty() {
             return Relation::Disjoint;
@@ -205,23 +207,21 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiPolygon<'a> {
             return Relation::Disjoint;
         }
         let mut relation = Relation::Disjoint;
-        for zolygon in self.polygons() {
-            match zolygon.relation(other) {
-                // contains take precedence over everything else
-                Relation::Contains => return Relation::Contains,
+        for line in self.lines() {
+            match line.relation(other) {
                 // Inretsects take precedence over contained
                 Relation::Contained if relation != Relation::Intersects => {
                     relation = Relation::Contained
                 }
                 Relation::Intersects => relation = Relation::Intersects,
-                Relation::Disjoint | Relation::Contained => {}
+                Relation::Disjoint | Relation::Contained | Relation::Contains => {}
             }
         }
         relation
     }
 }
 
-impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for ZultiPolygon<'a> {
+impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for ZultiLines<'a> {
     fn relation(&self, other: &ZultiPolygon) -> Relation {
         if self.is_empty() || other.is_empty() {
             return Relation::Disjoint;
@@ -230,23 +230,21 @@ impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for ZultiPolygon<'a> {
             return Relation::Disjoint;
         }
         let mut relation = Relation::Disjoint;
-        for zolygon in self.polygons() {
-            match zolygon.relation(other) {
-                // contains take precedence over everything else
-                Relation::Contains => return Relation::Contains,
+        for line in self.lines() {
+            match line.relation(other) {
                 // Inretsects take precedence over contained
                 Relation::Contained if relation != Relation::Intersects => {
                     relation = Relation::Contained
                 }
                 Relation::Intersects => relation = Relation::Intersects,
-                Relation::Disjoint | Relation::Contained => {}
+                Relation::Disjoint | Relation::Contained | Relation::Contains => {}
             }
         }
         relation
     }
 }
 
-impl<'a> RelationBetweenShapes<Zerometry<'a>> for ZultiPolygon<'a> {
+impl<'a> RelationBetweenShapes<Zerometry<'a>> for ZultiLines<'a> {
     fn relation(&self, other: &Zerometry<'a>) -> Relation {
         match other.relation(self) {
             Relation::Contains => Relation::Contained,
@@ -258,34 +256,29 @@ impl<'a> RelationBetweenShapes<Zerometry<'a>> for ZultiPolygon<'a> {
 
 #[cfg(test)]
 mod tests {
-    use geo_types::{LineString, Polygon};
+    use geo::LineString;
+    use geo_types::MultiLineString;
     use insta::{assert_compact_debug_snapshot, assert_debug_snapshot, assert_snapshot};
 
     use super::*;
 
     #[test]
     fn test_write_from_geometry_with_even_number_of_elements() {
-        let first_polygon = Polygon::new(
-            LineString::from(vec![
-                Point::from((0.0, 0.0)),
-                Point::from((10.0, 0.0)),
-                Point::from((0.0, 10.0)),
-            ]),
-            vec![],
-        );
-        let second_polygon = Polygon::new(
-            LineString::from(vec![
-                Point::from((10.0, 10.0)),
-                Point::from((20.0, 0.0)),
-                Point::from((20.0, 10.0)),
-            ]),
-            vec![],
-        );
-        let geometry = MultiPolygon::from(vec![first_polygon.clone(), second_polygon.clone()]);
+        let first_line = LineString::from(vec![
+            Point::from((0.0, 0.0)),
+            Point::from((10.0, 0.0)),
+            Point::from((0.0, 10.0)),
+        ]);
+        let second_line = LineString::from(vec![
+            Point::from((10.0, 10.0)),
+            Point::from((20.0, 0.0)),
+            Point::from((20.0, 10.0)),
+        ]);
+        let geometry = MultiLineString::new(vec![first_line.clone(), second_line.clone()]);
 
         let mut writer = Vec::new();
 
-        ZultiPolygon::write_from_geometry(&mut writer, &geometry).unwrap();
+        ZultiLines::write_from_geometry(&mut writer, &geometry).unwrap();
         // Debug everything at once just to make sure it never changes
         assert_debug_snapshot!(writer);
         let mut current_offset = 0;
@@ -305,35 +298,35 @@ mod tests {
             &writer[current_offset
                 ..current_offset + mem::size_of::<u32>() * expected_nb_offsets as usize],
         );
-        assert_compact_debug_snapshot!(expected_offsets, @"[0, 96]");
+        assert_compact_debug_snapshot!(expected_offsets, @"[0, 80]");
         current_offset += mem::size_of::<u32>() * expected_nb_offsets as usize;
         // Now there should be a one u32 of padding
         let padding = &writer[current_offset..current_offset + mem::size_of::<u32>()];
         assert_compact_debug_snapshot!(padding, @"[0, 0, 0, 0]");
         current_offset += mem::size_of::<u32>();
-        // Now there should be the first zolygon at the offset 0
-        let first_zolygon_bytes = &writer[current_offset + expected_offsets[0] as usize
+        // Now there should be the first zine at the offset 0
+        let first_zine_bytes = &writer[current_offset + expected_offsets[0] as usize
             ..current_offset + expected_offsets[1] as usize];
-        assert_compact_debug_snapshot!(first_zolygon_bytes, @"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]");
-        let first_zolygon = Zolygon::from_bytes(first_zolygon_bytes);
-        assert_compact_debug_snapshot!(first_zolygon, @"Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }, coords: [Coord { x: 0.0, y: 0.0 }, Coord { x: 10.0, y: 0.0 }, Coord { x: 0.0, y: 10.0 }, Coord { x: 0.0, y: 0.0 }] }");
-        assert_eq!(first_zolygon, first_polygon);
-        let second_zolygon_bytes = &writer[current_offset + expected_offsets[1] as usize..];
-        assert_compact_debug_snapshot!(second_zolygon_bytes, @"[0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 52, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 52, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 52, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64]");
-        let second_zolygon = Zolygon::from_bytes(second_zolygon_bytes);
-        assert_compact_debug_snapshot!(second_zolygon, @"Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 10.0, y: 0.0 }, top_right: Coord { x: 20.0, y: 10.0 } }, coords: [Coord { x: 10.0, y: 10.0 }, Coord { x: 20.0, y: 0.0 }, Coord { x: 20.0, y: 10.0 }, Coord { x: 10.0, y: 10.0 }] }");
-        assert_eq!(second_zolygon, second_polygon);
+        assert_compact_debug_snapshot!(first_zine_bytes, @"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64]");
+        let first_zine = Zine::from_bytes(first_zine_bytes);
+        assert_compact_debug_snapshot!(first_zine, @"Zine { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }, points: [Zoint { lng: 0.0, lat: 0.0 }, Zoint { lng: 10.0, lat: 0.0 }, Zoint { lng: 0.0, lat: 10.0 }] }");
+        assert_eq!(first_zine, first_line);
+        let second_zine_bytes = &writer[current_offset + expected_offsets[1] as usize..];
+        assert_compact_debug_snapshot!(second_zine_bytes, @"[0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 52, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 52, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 52, 64, 0, 0, 0, 0, 0, 0, 36, 64]");
+        let second_zine = Zine::from_bytes(second_zine_bytes);
+        assert_compact_debug_snapshot!(second_zine, @"Zine { bounding_box: BoundingBox { bottom_left: Coord { x: 10.0, y: 0.0 }, top_right: Coord { x: 20.0, y: 10.0 } }, points: [Zoint { lng: 10.0, lat: 10.0 }, Zoint { lng: 20.0, lat: 0.0 }, Zoint { lng: 20.0, lat: 10.0 }] }");
+        assert_eq!(second_zine, second_line);
 
-        // Try to parse the zulti polygon
-        let zulti_polygon = ZultiPolygon::from_bytes(&writer);
-        assert_snapshot!(zulti_polygon.len(), @"2");
-        assert_compact_debug_snapshot!(zulti_polygon.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 20.0, y: 10.0 } }");
-        assert_compact_debug_snapshot!(zulti_polygon.offsets, @"[0, 96]");
-        assert_compact_debug_snapshot!(zulti_polygon.get(0).unwrap(), @"Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }, coords: [Coord { x: 0.0, y: 0.0 }, Coord { x: 10.0, y: 0.0 }, Coord { x: 0.0, y: 10.0 }, Coord { x: 0.0, y: 0.0 }] }");
-        assert_compact_debug_snapshot!(zulti_polygon.get(1).unwrap(), @"Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 10.0, y: 0.0 }, top_right: Coord { x: 20.0, y: 10.0 } }, coords: [Coord { x: 10.0, y: 10.0 }, Coord { x: 20.0, y: 0.0 }, Coord { x: 20.0, y: 10.0 }, Coord { x: 10.0, y: 10.0 }] }");
-        assert_compact_debug_snapshot!(zulti_polygon.get(2), @"None");
-        assert_debug_snapshot!(zulti_polygon, @r"
-        ZultiPolygon {
+        // Try to parse the zulti lines
+        let zulti_lines = ZultiLines::from_bytes(&writer);
+        assert_snapshot!(zulti_lines.len(), @"2");
+        assert_compact_debug_snapshot!(zulti_lines.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 20.0, y: 10.0 } }");
+        assert_compact_debug_snapshot!(zulti_lines.offsets, @"[0, 80]");
+        assert_compact_debug_snapshot!(zulti_lines.get(0).unwrap(), @"Zine { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }, points: [Zoint { lng: 0.0, lat: 0.0 }, Zoint { lng: 10.0, lat: 0.0 }, Zoint { lng: 0.0, lat: 10.0 }] }");
+        assert_compact_debug_snapshot!(zulti_lines.get(1).unwrap(), @"Zine { bounding_box: BoundingBox { bottom_left: Coord { x: 10.0, y: 0.0 }, top_right: Coord { x: 20.0, y: 10.0 } }, points: [Zoint { lng: 10.0, lat: 10.0 }, Zoint { lng: 20.0, lat: 0.0 }, Zoint { lng: 20.0, lat: 10.0 }] }");
+        assert_compact_debug_snapshot!(zulti_lines.get(2), @"None");
+        assert_debug_snapshot!(zulti_lines, @r"
+        ZultiLines {
             bounding_box: BoundingBox {
                 bottom_left: Coord {
                     x: 0.0,
@@ -344,8 +337,8 @@ mod tests {
                     y: 10.0,
                 },
             },
-            zolygons: [
-                Zolygon {
+            zines: [
+                Zine {
                     bounding_box: BoundingBox {
                         bottom_left: Coord {
                             x: 0.0,
@@ -356,26 +349,22 @@ mod tests {
                             y: 10.0,
                         },
                     },
-                    coords: [
-                        Coord {
-                            x: 0.0,
-                            y: 0.0,
+                    points: [
+                        Zoint {
+                            lng: 0.0,
+                            lat: 0.0,
                         },
-                        Coord {
-                            x: 10.0,
-                            y: 0.0,
+                        Zoint {
+                            lng: 10.0,
+                            lat: 0.0,
                         },
-                        Coord {
-                            x: 0.0,
-                            y: 10.0,
-                        },
-                        Coord {
-                            x: 0.0,
-                            y: 0.0,
+                        Zoint {
+                            lng: 0.0,
+                            lat: 10.0,
                         },
                     ],
                 },
-                Zolygon {
+                Zine {
                     bounding_box: BoundingBox {
                         bottom_left: Coord {
                             x: 10.0,
@@ -386,22 +375,18 @@ mod tests {
                             y: 10.0,
                         },
                     },
-                    coords: [
-                        Coord {
-                            x: 10.0,
-                            y: 10.0,
+                    points: [
+                        Zoint {
+                            lng: 10.0,
+                            lat: 10.0,
                         },
-                        Coord {
-                            x: 20.0,
-                            y: 0.0,
+                        Zoint {
+                            lng: 20.0,
+                            lat: 0.0,
                         },
-                        Coord {
-                            x: 20.0,
-                            y: 10.0,
-                        },
-                        Coord {
-                            x: 10.0,
-                            y: 10.0,
+                        Zoint {
+                            lng: 20.0,
+                            lat: 10.0,
                         },
                     ],
                 },
@@ -412,19 +397,16 @@ mod tests {
 
     #[test]
     fn test_write_from_geometry_with_odd_number_of_elements() {
-        let first_polygon = Polygon::new(
-            LineString::from(vec![
-                Point::from((0.0, 0.0)),
-                Point::from((10.0, 0.0)),
-                Point::from((0.0, 10.0)),
-            ]),
-            vec![],
-        );
-        let geometry = MultiPolygon::from(vec![first_polygon.clone()]);
+        let first_line = LineString::from(vec![
+            Point::from((0.0, 0.0)),
+            Point::from((10.0, 0.0)),
+            Point::from((0.0, 10.0)),
+        ]);
+        let geometry = MultiLineString::new(vec![first_line.clone()]);
 
         let mut writer = Vec::new();
 
-        ZultiPolygon::write_from_geometry(&mut writer, &geometry).unwrap();
+        ZultiLines::write_from_geometry(&mut writer, &geometry).unwrap();
         // Debug everything at once just to make sure it never changes
         assert_debug_snapshot!(writer);
         let mut current_offset = 0;
@@ -448,22 +430,22 @@ mod tests {
         current_offset += mem::size_of::<u32>() * expected_nb_offsets as usize;
         // This time we should not have any padding
         // -
-        // Now there should be the first zolygon at the offset 0
-        let first_zolygon_bytes = &writer[current_offset + expected_offsets[0] as usize..];
-        assert_compact_debug_snapshot!(first_zolygon_bytes, @"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]");
-        let first_zolygon = Zolygon::from_bytes(first_zolygon_bytes);
-        assert_compact_debug_snapshot!(first_zolygon, @"Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }, coords: [Coord { x: 0.0, y: 0.0 }, Coord { x: 10.0, y: 0.0 }, Coord { x: 0.0, y: 10.0 }, Coord { x: 0.0, y: 0.0 }] }");
-        assert_eq!(first_zolygon, first_polygon);
+        // Now there should be the first zine at the offset 0
+        let first_zine_bytes = &writer[current_offset + expected_offsets[0] as usize..];
+        assert_compact_debug_snapshot!(first_zine_bytes, @"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64]");
+        let first_zine = Zine::from_bytes(first_zine_bytes);
+        assert_compact_debug_snapshot!(first_zine, @"Zine { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }, points: [Zoint { lng: 0.0, lat: 0.0 }, Zoint { lng: 10.0, lat: 0.0 }, Zoint { lng: 0.0, lat: 10.0 }] }");
+        assert_eq!(first_zine, first_line);
 
-        // Try to parse the zulti polygon
-        let zulti_polygon = ZultiPolygon::from_bytes(&writer);
+        // Try to parse the zulti lines
+        let zulti_polygon = ZultiLines::from_bytes(&writer);
         assert_snapshot!(zulti_polygon.len(), @"1");
         assert_compact_debug_snapshot!(zulti_polygon.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }");
         assert_compact_debug_snapshot!(zulti_polygon.offsets, @"[0]");
-        assert_compact_debug_snapshot!(zulti_polygon.get(0).unwrap(), @"Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }, coords: [Coord { x: 0.0, y: 0.0 }, Coord { x: 10.0, y: 0.0 }, Coord { x: 0.0, y: 10.0 }, Coord { x: 0.0, y: 0.0 }] }");
+        assert_compact_debug_snapshot!(zulti_polygon.get(0).unwrap(), @"Zine { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }, points: [Zoint { lng: 0.0, lat: 0.0 }, Zoint { lng: 10.0, lat: 0.0 }, Zoint { lng: 0.0, lat: 10.0 }] }");
         assert_compact_debug_snapshot!(zulti_polygon.get(1), @"None");
         assert_debug_snapshot!(zulti_polygon, @r"
-        ZultiPolygon {
+        ZultiLines {
             bounding_box: BoundingBox {
                 bottom_left: Coord {
                     x: 0.0,
@@ -474,8 +456,8 @@ mod tests {
                     y: 10.0,
                 },
             },
-            zolygons: [
-                Zolygon {
+            zines: [
+                Zine {
                     bounding_box: BoundingBox {
                         bottom_left: Coord {
                             x: 0.0,
@@ -486,22 +468,18 @@ mod tests {
                             y: 10.0,
                         },
                     },
-                    coords: [
-                        Coord {
-                            x: 0.0,
-                            y: 0.0,
+                    points: [
+                        Zoint {
+                            lng: 0.0,
+                            lat: 0.0,
                         },
-                        Coord {
-                            x: 10.0,
-                            y: 0.0,
+                        Zoint {
+                            lng: 10.0,
+                            lat: 0.0,
                         },
-                        Coord {
-                            x: 0.0,
-                            y: 10.0,
-                        },
-                        Coord {
-                            x: 0.0,
-                            y: 0.0,
+                        Zoint {
+                            lng: 0.0,
+                            lat: 10.0,
                         },
                     ],
                 },
@@ -512,11 +490,11 @@ mod tests {
 
     #[test]
     fn test_write_from_geometry_with_no_elements() {
-        let geometry = MultiPolygon::new(vec![]);
+        let geometry = MultiLineString::new(vec![]);
 
         let mut writer = Vec::new();
 
-        ZultiPolygon::write_from_geometry(&mut writer, &geometry).unwrap();
+        ZultiLines::write_from_geometry(&mut writer, &geometry).unwrap();
         // Debug everything at once just to make sure it never changes
         assert_debug_snapshot!(writer);
         let mut current_offset = 0;
@@ -542,14 +520,14 @@ mod tests {
         let padding = &writer[current_offset..current_offset + mem::size_of::<u32>()];
         assert_compact_debug_snapshot!(padding, @"[0, 0, 0, 0]");
 
-        // Try to parse the zulti polygon
-        let zulti_polygon = ZultiPolygon::from_bytes(&writer);
-        assert_snapshot!(zulti_polygon.len(), @"0");
-        assert_compact_debug_snapshot!(zulti_polygon.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 0.0, y: 0.0 } }");
-        assert_compact_debug_snapshot!(zulti_polygon.offsets, @"[]");
-        assert_compact_debug_snapshot!(zulti_polygon.get(0), @"None");
-        assert_debug_snapshot!(zulti_polygon, @r"
-        ZultiPolygon {
+        // Try to parse the zulti lines
+        let zulti_lines = ZultiLines::from_bytes(&writer);
+        assert_snapshot!(zulti_lines.len(), @"0");
+        assert_compact_debug_snapshot!(zulti_lines.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 0.0, y: 0.0 } }");
+        assert_compact_debug_snapshot!(zulti_lines.offsets, @"[]");
+        assert_compact_debug_snapshot!(zulti_lines.get(0), @"None");
+        assert_debug_snapshot!(zulti_lines, @r"
+        ZultiLines {
             bounding_box: BoundingBox {
                 bottom_left: Coord {
                     x: 0.0,
@@ -560,7 +538,7 @@ mod tests {
                     y: 0.0,
                 },
             },
-            zolygons: [],
+            zines: [],
         }
         ");
     }
