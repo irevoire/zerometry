@@ -5,7 +5,7 @@ use geo_types::{MultiLineString, Point};
 
 use crate::{
     BoundingBox, Relation, RelationBetweenShapes, Zerometry, Zoint, Zolygon, ZultiPoints,
-    ZultiPolygon, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES, zine::Zine,
+    ZultiPolygons, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES, zine::Zine,
 };
 
 #[derive(Clone, Copy)]
@@ -221,8 +221,8 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiLines<'a> {
     }
 }
 
-impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for ZultiLines<'a> {
-    fn relation(&self, other: &ZultiPolygon) -> Relation {
+impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for ZultiLines<'a> {
+    fn relation(&self, other: &ZultiPolygons) -> Relation {
         if self.is_empty() || other.is_empty() {
             return Relation::Disjoint;
         }

@@ -5,7 +5,7 @@ use geo_types::{Geometry, Polygon};
 
 use crate::{
     BoundingBox, COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS, Coord, Coords, Relation,
-    RelationBetweenShapes, Segment, Zerometry, Zoint, ZultiLines, ZultiPoints, ZultiPolygon,
+    RelationBetweenShapes, Segment, Zerometry, Zoint, ZultiLines, ZultiPoints, ZultiPolygons,
     zine::Zine,
 };
 
@@ -211,8 +211,8 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zolygon<'a> {
     }
 }
 
-impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for Zolygon<'a> {
-    fn relation(&self, other: &ZultiPolygon<'a>) -> Relation {
+impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for Zolygon<'a> {
+    fn relation(&self, other: &ZultiPolygons<'a>) -> Relation {
         match other.relation(self) {
             Relation::Contains => Relation::Contained,
             Relation::Contained => Relation::Contains,

@@ -10,7 +10,7 @@ mod zollection;
 mod zolygon;
 mod zulti_lines;
 mod zulti_points;
-mod zulti_polygon;
+mod zulti_polygons;
 
 use std::mem;
 
@@ -27,7 +27,7 @@ pub use zollection::Zollection;
 pub use zolygon::Zolygon;
 pub use zulti_lines::ZultiLines;
 pub use zulti_points::ZultiPoints;
-pub use zulti_polygon::ZultiPolygon;
+pub use zulti_polygons::ZultiPolygons;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Zerometry<'a> {
@@ -36,7 +36,7 @@ pub enum Zerometry<'a> {
     Line(Zine<'a>),
     MultiLines(ZultiLines<'a>),
     Polygon(Zolygon<'a>),
-    MultiPolygon(ZultiPolygon<'a>),
+    MultiPolygon(ZultiPolygons<'a>),
     Collection(Zollection<'a>),
 }
 
@@ -76,7 +76,7 @@ impl<'a> Zerometry<'a> {
             0 => Ok(Zerometry::Point(Zoint::from_bytes(data))),
             1 => Ok(Zerometry::MultiPoints(ZultiPoints::from_bytes(data))),
             2 => Ok(Zerometry::Polygon(Zolygon::from_bytes(data))),
-            3 => Ok(Zerometry::MultiPolygon(ZultiPolygon::from_bytes(data))),
+            3 => Ok(Zerometry::MultiPolygon(ZultiPolygons::from_bytes(data))),
             // They're located after because it would be a db-breaking to edit the already existing tags
             4 => Ok(Zerometry::Line(Zine::from_bytes(data))),
             5 => Ok(Zerometry::MultiLines(ZultiLines::from_bytes(data))),
@@ -108,7 +108,7 @@ impl<'a> Zerometry<'a> {
             }
             Geometry::MultiPolygon(multi_polygon) => {
                 writer.extend_from_slice(&3_u64.to_ne_bytes());
-                ZultiPolygon::write_from_geometry(writer, multi_polygon)?;
+                ZultiPolygons::write_from_geometry(writer, multi_polygon)?;
             }
             Geometry::LineString(line_string) => {
                 writer.extend_from_slice(&4_u64.to_ne_bytes());
@@ -169,7 +169,7 @@ impl<'a> Zerometry<'a> {
         }
     }
 
-    pub fn to_multi_polygon(&self) -> Option<ZultiPolygon> {
+    pub fn to_multi_polygon(&self) -> Option<ZultiPolygons> {
         match self {
             Zerometry::MultiPolygon(a) => Some(*a),
             _ => None,
@@ -207,8 +207,8 @@ impl<'a> From<Zolygon<'a>> for Zerometry<'a> {
     }
 }
 
-impl<'a> From<ZultiPolygon<'a>> for Zerometry<'a> {
-    fn from(polygon: ZultiPolygon<'a>) -> Self {
+impl<'a> From<ZultiPolygons<'a>> for Zerometry<'a> {
+    fn from(polygon: ZultiPolygons<'a>) -> Self {
         Zerometry::MultiPolygon(polygon)
     }
 }
@@ -283,8 +283,8 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zerometry<'a> {
     }
 }
 
-impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for Zerometry<'a> {
-    fn relation(&self, other: &ZultiPolygon) -> Relation {
+impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for Zerometry<'a> {
+    fn relation(&self, other: &ZultiPolygons) -> Relation {
         match self {
             Zerometry::Point(a) => a.relation(other),
             Zerometry::MultiPoints(a) => a.relation(other),

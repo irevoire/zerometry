@@ -3,7 +3,7 @@ use std::{io, mem};
 use geo::{GeometryCollection, MultiLineString, MultiPoint, MultiPolygon, Point};
 
 use crate::{
-    BoundingBox, ZultiLines, ZultiPoints, ZultiPolygon, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES,
+    BoundingBox, ZultiLines, ZultiPoints, ZultiPolygons, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES,
 };
 
 /// This type is used to merge both the feature collection and the geometry collection.
@@ -23,7 +23,7 @@ pub struct Zollection<'a> {
     //
     points: ZultiPoints<'a>,
     lines: ZultiLines<'a>,
-    polygons: ZultiPolygon<'a>,
+    polygons: ZultiPolygons<'a>,
 }
 
 impl<'a> Zollection<'a> {
@@ -31,7 +31,7 @@ impl<'a> Zollection<'a> {
         bounding_box: &'a BoundingBox,
         points: ZultiPoints<'a>,
         lines: ZultiLines<'a>,
-        polygons: ZultiPolygon<'a>,
+        polygons: ZultiPolygons<'a>,
     ) -> Self {
         Self {
             bounding_box,
@@ -63,7 +63,7 @@ impl<'a> Zollection<'a> {
         let lines = ZultiLines::from_bytes(lines);
 
         let polygons = &data[polygons_offset..];
-        let polygons = ZultiPolygon::from_bytes(polygons);
+        let polygons = ZultiPolygons::from_bytes(polygons);
 
         Self {
             bounding_box,
@@ -118,7 +118,7 @@ impl<'a> Zollection<'a> {
             .copy_from_slice(&polygon_offset);
 
         // Write the polygons and nothing to update anymore
-        ZultiPolygon::write_from_geometry(writer, &polygons)?;
+        ZultiPolygons::write_from_geometry(writer, &polygons)?;
 
         Ok(())
     }
@@ -143,7 +143,7 @@ impl<'a> Zollection<'a> {
         self.lines
     }
 
-    pub fn polygons(&'a self) -> ZultiPolygon<'a> {
+    pub fn polygons(&'a self) -> ZultiPolygons<'a> {
         self.polygons
     }
 
@@ -298,8 +298,8 @@ mod tests {
         // Now there should be the first multi lines at the offset line to the offset polygon
         let polygons_bytes = &writer[current_offset + polygon_offset as usize..];
         assert_compact_debug_snapshot!(polygons_bytes, @"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 64, 0, 0, 0, 0, 0, 0, 20, 64, 2, 0, 0, 0, 0, 0, 0, 0, 96, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 63, 0, 0, 0, 0, 0, 0, 240, 63, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 0, 20, 64, 0, 0, 0, 0, 0, 0, 20, 64, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 0, 16, 64, 0, 0, 0, 0, 0, 0, 16, 64, 0, 0, 0, 0, 0, 0, 20, 64, 0, 0, 0, 0, 0, 0, 20, 64, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 0, 8, 64]");
-        let polygons = ZultiPolygon::from_bytes(polygons_bytes);
-        assert_compact_debug_snapshot!(polygons, @"ZultiPolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 5.0, y: 5.0 } }, zolygons: [Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 2.0, y: 2.0 } }, coords: [Coord { x: 0.0, y: 0.0 }, Coord { x: 1.0, y: 1.0 }, Coord { x: 2.0, y: 2.0 }, Coord { x: 0.0, y: 0.0 }] }, Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 3.0, y: 3.0 }, top_right: Coord { x: 5.0, y: 5.0 } }, coords: [Coord { x: 3.0, y: 3.0 }, Coord { x: 4.0, y: 4.0 }, Coord { x: 5.0, y: 5.0 }, Coord { x: 3.0, y: 3.0 }] }] }");
+        let polygons = ZultiPolygons::from_bytes(polygons_bytes);
+        assert_compact_debug_snapshot!(polygons, @"ZultiPolygons { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 5.0, y: 5.0 } }, zolygons: [Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 2.0, y: 2.0 } }, coords: [Coord { x: 0.0, y: 0.0 }, Coord { x: 1.0, y: 1.0 }, Coord { x: 2.0, y: 2.0 }, Coord { x: 0.0, y: 0.0 }] }, Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 3.0, y: 3.0 }, top_right: Coord { x: 5.0, y: 5.0 } }, coords: [Coord { x: 3.0, y: 3.0 }, Coord { x: 4.0, y: 4.0 }, Coord { x: 5.0, y: 5.0 }, Coord { x: 3.0, y: 3.0 }] }] }");
         assert_eq!(polygons, multi_polygons);
 
         // Try to parse the whole collection
@@ -401,7 +401,7 @@ mod tests {
                     },
                 ],
             },
-            polygons: ZultiPolygon {
+            polygons: ZultiPolygons {
                 bounding_box: BoundingBox {
                     bottom_left: Coord {
                         x: 0.0,
@@ -527,8 +527,8 @@ mod tests {
         // Now there should be the first multi lines at the offset line to the offset polygon
         let polygons_bytes = &writer[current_offset + polygon_offset as usize..];
         assert_compact_debug_snapshot!(polygons_bytes, @"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]");
-        let polygons = ZultiPolygon::from_bytes(polygons_bytes);
-        assert_compact_debug_snapshot!(polygons, @"ZultiPolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 0.0, y: 0.0 } }, zolygons: [] }");
+        let polygons = ZultiPolygons::from_bytes(polygons_bytes);
+        assert_compact_debug_snapshot!(polygons, @"ZultiPolygons { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 0.0, y: 0.0 } }, zolygons: [] }");
         assert!(polygons.is_empty());
 
         // Try to parse the whole collection
@@ -572,7 +572,7 @@ mod tests {
                 },
                 zines: [],
             },
-            polygons: ZultiPolygon {
+            polygons: ZultiPolygons {
                 bounding_box: BoundingBox {
                     bottom_left: Coord {
                         x: 0.0,
@@ -659,7 +659,7 @@ mod tests {
                 },
                 zines: [],
             },
-            polygons: ZultiPolygon {
+            polygons: ZultiPolygons {
                 bounding_box: BoundingBox {
                     bottom_left: Coord {
                         x: 0.0,
