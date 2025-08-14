@@ -191,6 +191,7 @@ impl<'a> RelationBetweenShapes<Zerometry<'a>> for Zine<'a> {
             Zerometry::MultiLines(zulti_lines) => self.relation(zulti_lines),
             Zerometry::Polygon(zolygon) => self.relation(zolygon),
             Zerometry::MultiPolygon(zulti_polygon) => self.relation(zulti_polygon),
+            Zerometry::Collection(zollection) => todo!(),
         }
     }
 }

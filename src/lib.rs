@@ -6,6 +6,7 @@ mod segment;
 mod test;
 mod zine;
 mod zoint;
+mod zollection;
 mod zolygon;
 mod zulti_lines;
 mod zulti_points;
@@ -22,6 +23,7 @@ use geo_types::{Geometry, MultiPolygon, Polygon};
 pub use segment::Segment;
 pub use zine::Zine;
 pub use zoint::Zoint;
+pub use zollection::Zollection;
 pub use zolygon::Zolygon;
 pub use zulti_lines::ZultiLines;
 pub use zulti_points::ZultiPoints;
@@ -35,6 +37,7 @@ pub enum Zerometry<'a> {
     MultiLines(ZultiLines<'a>),
     Polygon(Zolygon<'a>),
     MultiPolygon(ZultiPolygon<'a>),
+    Collection(Zollection<'a>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -181,6 +184,7 @@ impl<'a> Zerometry<'a> {
             Zerometry::MultiLines(a) => Geometry::MultiLineString(a.to_geo()),
             Zerometry::Polygon(a) => Geometry::Polygon(a.to_geo()),
             Zerometry::MultiPolygon(a) => Geometry::MultiPolygon(a.to_geo()),
+            Zerometry::Collection(zollection) => Geometry::GeometryCollection(zollection.to_geo()),
         }
     }
 }
@@ -218,6 +222,7 @@ impl<'a> RelationBetweenShapes<Zoint<'a>> for Zerometry<'a> {
             Zerometry::MultiLines(a) => a.relation(other),
             Zerometry::Polygon(a) => a.relation(other),
             Zerometry::MultiPolygon(a) => a.relation(other),
+            Zerometry::Collection(zollection) => todo!(),
         }
     }
 }
@@ -231,6 +236,7 @@ impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zerometry<'a> {
             Zerometry::MultiLines(a) => a.relation(other),
             Zerometry::Polygon(a) => a.relation(other),
             Zerometry::MultiPolygon(a) => a.relation(other),
+            Zerometry::Collection(zollection) => todo!(),
         }
     }
 }
@@ -244,6 +250,7 @@ impl<'a> RelationBetweenShapes<Zine<'a>> for Zerometry<'a> {
             Zerometry::Line(a) => a.relation(other),
             Zerometry::Polygon(a) => a.relation(other),
             Zerometry::MultiPolygon(a) => a.relation(other),
+            Zerometry::Collection(zollection) => todo!(),
         }
     }
 }
@@ -257,6 +264,7 @@ impl<'a> RelationBetweenShapes<ZultiLines<'a>> for Zerometry<'a> {
             Zerometry::Line(a) => a.relation(other),
             Zerometry::Polygon(a) => a.relation(other),
             Zerometry::MultiPolygon(a) => a.relation(other),
+            Zerometry::Collection(zollection) => todo!(),
         }
     }
 }
@@ -270,6 +278,7 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zerometry<'a> {
             Zerometry::Line(a) => a.relation(other),
             Zerometry::Polygon(a) => a.relation(other),
             Zerometry::MultiPolygon(a) => a.relation(other),
+            Zerometry::Collection(zollection) => todo!(),
         }
     }
 }
@@ -283,6 +292,7 @@ impl<'a> RelationBetweenShapes<ZultiPolygon<'a>> for Zerometry<'a> {
             Zerometry::Line(a) => a.relation(other),
             Zerometry::Polygon(a) => a.relation(other),
             Zerometry::MultiPolygon(a) => a.relation(other),
+            Zerometry::Collection(zollection) => todo!(),
         }
     }
 }
@@ -296,6 +306,7 @@ impl<'a> RelationBetweenShapes<Zerometry<'a>> for Zerometry<'a> {
             Zerometry::MultiLines(a) => self.relation(a),
             Zerometry::Polygon(a) => self.relation(a),
             Zerometry::MultiPolygon(a) => self.relation(a),
+            Zerometry::Collection(zollection) => todo!(),
         }
     }
 }
