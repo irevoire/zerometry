@@ -1,6 +1,6 @@
-use std::{arch::aarch64::poly16x8x2_t, fmt, io, mem};
+use std::{io, mem};
 
-use geo::{GeometryCollection, MultiLineString, MultiPoint, MultiPolygon, Point, TriangulateSpade};
+use geo::{GeometryCollection, MultiLineString, MultiPoint, MultiPolygon, Point};
 
 use crate::{
     BoundingBox, ZultiLines, ZultiPoints, ZultiPolygon, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES,
