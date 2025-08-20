@@ -190,7 +190,6 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zolygon<'a> {
     fn relation(&self, other: &Zolygon<'a>, relation: InputRelation) -> OutputRelation {
         let output = relation.to_false();
 
-        #[allow(clippy::if_same_then_else)] // readability
         if self.is_empty() || other.is_empty() || self.bounding_box().disjoint(other.bounding_box())
         {
             return output.make_disjoint_if_set();
