@@ -4,8 +4,8 @@ use bytemuck::cast_slice;
 use geo_types::{MultiLineString, Point};
 
 use crate::{
-    BoundingBox, Relation, RelationBetweenShapes, Zerometry, Zoint, Zolygon, ZultiPoints,
-    ZultiPolygons, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES, zine::Zine,
+    BoundingBox, InputRelation, OutputRelation, RelationBetweenShapes, Zerometry, Zoint, Zolygon,
+    ZultiPoints, ZultiPolygons, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES, zine::Zine,
 };
 
 #[derive(Clone, Copy)]
@@ -147,110 +147,127 @@ impl<'a> fmt::Debug for ZultiLines<'a> {
 
 // points and line have nothing in common
 impl<'a> RelationBetweenShapes<Zoint<'a>> for ZultiLines<'a> {
-    fn relation(&self, _other: &Zoint) -> Relation {
-        Relation::Disjoint
+    fn relation(&self, _other: &Zoint, relation: InputRelation) -> OutputRelation {
+        relation.to_false().make_disjoint_if_set()
     }
 }
 
 impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for ZultiLines<'a> {
-    fn relation(&self, _other: &ZultiPoints) -> Relation {
-        Relation::Disjoint
+    fn relation(&self, _other: &ZultiPoints, relation: InputRelation) -> OutputRelation {
+        relation.to_false().make_disjoint_if_set()
     }
 }
 
 impl<'a> RelationBetweenShapes<Zine<'a>> for ZultiLines<'a> {
-    fn relation(&self, other: &Zine) -> Relation {
-        if self.is_empty()
-            || other.is_empty()
-            || self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint
+    fn relation(&self, other: &Zine, relation: InputRelation) -> OutputRelation {
+        if self.is_empty() || other.is_empty() || self.bounding_box().disjoint(other.bounding_box())
         {
-            return Relation::Disjoint;
+            return relation.to_false().make_disjoint_if_set();
         }
 
         for line in self.lines() {
-            if line.relation(other) == Relation::Intersects {
-                return Relation::Intersects;
+            if line.intersects(other) {
+                return relation.to_false().make_intersect_if_set();
             }
         }
 
-        Relation::Disjoint
+        relation.to_false().make_disjoint_if_set()
     }
 }
 
 impl<'a> RelationBetweenShapes<ZultiLines<'a>> for ZultiLines<'a> {
-    fn relation(&self, other: &ZultiLines) -> Relation {
-        if self.is_empty()
-            || other.is_empty()
-            || self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint
+    fn relation(&self, other: &ZultiLines, relation: InputRelation) -> OutputRelation {
+        if self.is_empty() || other.is_empty() || self.bounding_box().disjoint(other.bounding_box())
         {
-            return Relation::Disjoint;
+            return relation.to_false().make_disjoint_if_set();
         }
 
         for left in self.lines() {
             for right in other.lines() {
-                if left.relation(&right) == Relation::Intersects {
-                    return Relation::Intersects;
+                if left.intersects(&right) {
+                    return relation.to_false().make_intersect_if_set();
                 }
             }
         }
 
-        Relation::Disjoint
+        relation.to_false().make_disjoint_if_set()
     }
 }
 
 impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiLines<'a> {
-    fn relation(&self, other: &Zolygon) -> Relation {
-        if self.is_empty() || other.is_empty() {
-            return Relation::Disjoint;
+    fn relation(&self, other: &Zolygon, relation: InputRelation) -> OutputRelation {
+        let mut output = relation.to_false();
+
+        if self.is_empty() || other.is_empty() || self.bounding_box().disjoint(other.bounding_box())
+        {
+            return output.make_disjoint_if_set();
         }
-        if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
-            return Relation::Disjoint;
-        }
-        let mut relation = Relation::Disjoint;
+
+        let mut contained = 0;
         for line in self.lines() {
-            match line.relation(other) {
-                // Inretsects take precedence over contained
-                Relation::Contained if relation != Relation::Intersects => {
-                    relation = Relation::Contained
-                }
-                Relation::Intersects => relation = Relation::Intersects,
-                Relation::Disjoint | Relation::Contained | Relation::Contains => {}
+            let r = line.relation(other, relation.strip_strict().strip_disjoint());
+            output |= r;
+            if r.contained.unwrap_or_default() {
+                contained += 1;
+            }
+
+            if output.any_relation() && relation.early_exit {
+                return output;
             }
         }
-        relation
+        if output.any_relation() {
+            if contained == self.len() {
+                output.make_strict_contains_if_set()
+            } else {
+                output
+            }
+        } else {
+            output.make_disjoint_if_set()
+        }
     }
 }
 
 impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for ZultiLines<'a> {
-    fn relation(&self, other: &ZultiPolygons) -> Relation {
-        if self.is_empty() || other.is_empty() {
-            return Relation::Disjoint;
+    fn relation(&self, other: &ZultiPolygons, relation: InputRelation) -> OutputRelation {
+        let mut output = relation.to_false();
+
+        if self.is_empty() || other.is_empty() || self.bounding_box().disjoint(other.bounding_box())
+        {
+            return output.make_disjoint_if_set();
         }
-        if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
-            return Relation::Disjoint;
-        }
-        let mut relation = Relation::Disjoint;
+        let mut contained = 0;
         for line in self.lines() {
-            match line.relation(other) {
-                // Inretsects take precedence over contained
-                Relation::Contained if relation != Relation::Intersects => {
-                    relation = Relation::Contained
-                }
-                Relation::Intersects => relation = Relation::Intersects,
-                Relation::Disjoint | Relation::Contained | Relation::Contains => {}
+            let r = line.relation(other, relation.strip_strict().strip_disjoint());
+            output |= r;
+            if r.contained.unwrap_or_default() {
+                contained += 1;
+            }
+
+            if output.any_relation() && relation.early_exit {
+                return output;
+            }
+
+            if output.any_relation() && relation.early_exit {
+                return output;
             }
         }
-        relation
+        if output.any_relation() {
+            if contained == self.len() {
+                output.make_strict_contains_if_set()
+            } else {
+                output
+            }
+        } else {
+            output.make_disjoint_if_set()
+        }
     }
 }
 
 impl<'a> RelationBetweenShapes<Zerometry<'a>> for ZultiLines<'a> {
-    fn relation(&self, other: &Zerometry<'a>) -> Relation {
-        match other.relation(self) {
-            Relation::Contains => Relation::Contained,
-            Relation::Contained => Relation::Contains,
-            r => r,
-        }
+    fn relation(&self, other: &Zerometry<'a>, relation: InputRelation) -> OutputRelation {
+        other
+            .relation(self, relation.swap_contains_relation())
+            .swap_contains_relation()
     }
 }
 

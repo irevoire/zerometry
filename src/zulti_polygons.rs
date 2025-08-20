@@ -4,8 +4,8 @@ use bytemuck::cast_slice;
 use geo_types::{MultiPolygon, Point};
 
 use crate::{
-    BoundingBox, Relation, RelationBetweenShapes, Zerometry, Zoint, Zolygon, ZultiLines,
-    ZultiPoints, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES, zine::Zine,
+    BoundingBox, InputRelation, OutputRelation, RelationBetweenShapes, Zerometry, Zoint, Zolygon,
+    ZultiLines, ZultiPoints, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES, zine::Zine,
 };
 
 #[derive(Clone, Copy)]
@@ -145,114 +145,130 @@ impl<'a> fmt::Debug for ZultiPolygons<'a> {
 }
 
 impl<'a> RelationBetweenShapes<Zoint<'a>> for ZultiPolygons<'a> {
-    fn relation(&self, other: &Zoint) -> Relation {
-        if self.is_empty() {
-            return Relation::Disjoint;
-        }
-        if !self.bounding_box().contains_coord(other.coord()) {
-            return Relation::Disjoint;
+    fn relation(&self, other: &Zoint, relation: InputRelation) -> OutputRelation {
+        if self.is_empty() || !self.bounding_box().contains_coord(other.coord()) {
+            return relation.to_false().make_disjoint_if_set();
         }
         for zolygon in self.polygons() {
-            if zolygon.relation(other) == Relation::Contains {
-                return Relation::Contains;
+            if zolygon.strict_contains(other) {
+                return relation.to_false().make_strict_contains_if_set();
             }
         }
-        Relation::Disjoint
+        relation.to_false().make_disjoint_if_set()
     }
 }
 
 impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for ZultiPolygons<'a> {
-    fn relation(&self, other: &ZultiPoints) -> Relation {
-        if self.is_empty() || other.is_empty() {
-            return Relation::Disjoint;
+    fn relation(&self, other: &ZultiPoints, relation: InputRelation) -> OutputRelation {
+        let mut output = relation.to_false();
+
+        if self.is_empty() || other.is_empty() || self.bounding_box().disjoint(other.bounding_box())
+        {
+            return relation.to_false().make_disjoint_if_set();
         }
-        if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
-            return Relation::Disjoint;
-        }
+
+        let mut contains = 0;
         for zolygon in self.polygons() {
-            if zolygon.relation(other) == Relation::Contains {
-                return Relation::Contains;
+            for point in other.coords().iter() {
+                if zolygon.contains(point) {
+                    output = output.make_contains_if_set();
+                    contains += 1;
+                    if !relation.strict_contains || relation.early_exit {
+                        return output;
+                    }
+                }
             }
         }
-        Relation::Disjoint
+
+        if contains == other.len() {
+            output.make_strict_contains_if_set()
+        } else if output.any_relation() {
+            output
+        } else {
+            output.make_disjoint_if_set()
+        }
     }
 }
 
 impl<'a> RelationBetweenShapes<Zine<'a>> for ZultiPolygons<'a> {
-    fn relation(&self, other: &Zine) -> Relation {
-        match other.relation(self) {
-            Relation::Contained => Relation::Contains,
-            other => other,
-        }
+    fn relation(&self, other: &Zine, relation: InputRelation) -> OutputRelation {
+        other
+            .relation(self, relation.swap_contains_relation())
+            .swap_contains_relation()
     }
 }
 
 impl<'a> RelationBetweenShapes<ZultiLines<'a>> for ZultiPolygons<'a> {
-    fn relation(&self, other: &ZultiLines<'a>) -> Relation {
-        match other.relation(self) {
-            Relation::Contained => Relation::Contains,
-            other => other,
-        }
+    fn relation(&self, other: &ZultiLines, relation: InputRelation) -> OutputRelation {
+        other
+            .relation(self, relation.swap_contains_relation())
+            .swap_contains_relation()
     }
 }
 
 impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiPolygons<'a> {
-    fn relation(&self, other: &Zolygon) -> Relation {
-        if self.is_empty() || other.is_empty() {
-            return Relation::Disjoint;
+    fn relation(&self, other: &Zolygon, relation: InputRelation) -> OutputRelation {
+        if self.is_empty() || other.is_empty() || self.bounding_box().disjoint(other.bounding_box())
+        {
+            return relation.to_false().make_disjoint_if_set();
         }
-        if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
-            return Relation::Disjoint;
-        }
-        let mut relation = Relation::Disjoint;
+        let mut output = relation.to_false();
+
         for zolygon in self.polygons() {
-            match zolygon.relation(other) {
-                // contains take precedence over everything else
-                Relation::Contains => return Relation::Contains,
-                // Inretsects take precedence over contained
-                Relation::Contained if relation != Relation::Intersects => {
-                    relation = Relation::Contained
-                }
-                Relation::Intersects => relation = Relation::Intersects,
-                Relation::Disjoint | Relation::Contained => {}
+            output |= zolygon.relation(other, relation);
+            if output.any_relation() && relation.early_exit {
+                return output;
             }
         }
-        relation
+        if output.any_relation() {
+            output
+        } else {
+            output.make_disjoint_if_set()
+        }
     }
 }
 
 impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for ZultiPolygons<'a> {
-    fn relation(&self, other: &ZultiPolygons) -> Relation {
-        if self.is_empty() || other.is_empty() {
-            return Relation::Disjoint;
+    fn relation(&self, other: &ZultiPolygons, relation: InputRelation) -> OutputRelation {
+        if self.is_empty() || other.is_empty() || self.bounding_box().disjoint(other.bounding_box())
+        {
+            return relation.to_false().make_disjoint_if_set();
         }
-        if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
-            return Relation::Disjoint;
-        }
-        let mut relation = Relation::Disjoint;
+        let mut output = relation.to_false();
+        let mut contains = 0;
+        let mut contained = 0;
+
         for zolygon in self.polygons() {
-            match zolygon.relation(other) {
-                // contains take precedence over everything else
-                Relation::Contains => return Relation::Contains,
-                // Inretsects take precedence over contained
-                Relation::Contained if relation != Relation::Intersects => {
-                    relation = Relation::Contained
-                }
-                Relation::Intersects => relation = Relation::Intersects,
-                Relation::Disjoint | Relation::Contained => {}
+            let r = zolygon.relation(other, relation.strip_strict());
+            output |= r;
+            contains += r.contains.unwrap_or_default() as usize;
+            contained += r.contained.unwrap_or_default() as usize;
+
+            if output.any_relation() && relation.early_exit {
+                return output;
             }
         }
-        relation
+
+        if contains == other.len() {
+            output = output.make_strict_contains_if_set();
+        }
+        if contained == self.len() {
+            output = output.make_strict_contained_if_set();
+        }
+
+        if output.any_relation() {
+            output
+        } else {
+            output.make_disjoint_if_set()
+        }
     }
 }
 
 impl<'a> RelationBetweenShapes<Zerometry<'a>> for ZultiPolygons<'a> {
-    fn relation(&self, other: &Zerometry<'a>) -> Relation {
-        match other.relation(self) {
-            Relation::Contains => Relation::Contained,
-            Relation::Contained => Relation::Contains,
-            r => r,
-        }
+    fn relation(&self, other: &Zerometry, relation: InputRelation) -> OutputRelation {
+        other
+            .relation(self, relation.swap_contains_relation())
+            .swap_contains_relation()
     }
 }
 
