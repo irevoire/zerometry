@@ -210,11 +210,11 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zolygon<'a> {
         // safe to unwrap because we checked that the polygons are not empty
         let any = self.coords().iter().next().unwrap();
         if other.contains(any) {
-            return output.make_contained_if_set();
+            return output.make_strict_contained_if_set();
         }
         let any = other.coords().iter().next().unwrap();
         if self.contains(any) {
-            return output.make_contains_if_set();
+            return output.make_strict_contains_if_set();
         }
 
         output.make_disjoint_if_set()

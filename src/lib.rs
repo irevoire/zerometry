@@ -113,6 +113,11 @@ impl InputRelation {
         self
     }
 
+    pub fn strip_strict_contained(mut self) -> Self {
+        self.strict_contained = false;
+        self
+    }
+
     pub fn strip_disjoint(mut self) -> Self {
         self.disjoint = false;
         self

@@ -214,12 +214,25 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiPolygons<'a> {
         }
         let mut output = relation.to_false();
 
+        let mut contained = 0;
+
         for zolygon in self.polygons() {
-            output |= zolygon.relation(other, relation);
+            let r = zolygon.relation(other, relation.strip_disjoint().strip_strict_contained());
+            output |= r;
+
+            if r.contained.unwrap_or_default() {
+                contained += 1;
+            }
+
             if output.any_relation() && relation.early_exit {
                 return output;
             }
         }
+
+        if self.len() == contained {
+            output = output.make_strict_contained_if_set();
+        }
+
         if output.any_relation() {
             output
         } else {
@@ -238,14 +251,16 @@ impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for ZultiPolygons<'a> {
         let mut contains = 0;
         let mut contained = 0;
 
-        for zolygon in self.polygons() {
-            let r = zolygon.relation(other, relation.strip_strict());
-            output |= r;
-            contains += r.contains.unwrap_or_default() as usize;
-            contained += r.contained.unwrap_or_default() as usize;
+        for left in self.polygons() {
+            for right in other.polygons() {
+                let r = left.relation(&right, relation.strip_strict().strip_disjoint());
+                output |= r;
+                contains += r.contains.unwrap_or_default() as usize;
+                contained += r.contained.unwrap_or_default() as usize;
 
-            if output.any_relation() && relation.early_exit {
-                return output;
+                if output.any_relation() && relation.early_exit {
+                    return output;
+                }
             }
         }
 
@@ -282,6 +297,7 @@ impl PartialEq<MultiPolygon> for ZultiPolygons<'_> {
 
 #[cfg(test)]
 mod tests {
+    use geo::polygon;
     use geo_types::{LineString, Polygon};
     use insta::{assert_compact_debug_snapshot, assert_debug_snapshot, assert_snapshot};
 
@@ -587,5 +603,76 @@ mod tests {
             zolygons: [],
         }
         ");
+    }
+
+    #[test]
+    fn test_multi_polygon_contains_polygon() {
+        let polygon = polygon![
+             (x: 0., y: 0.),
+             (x: 1., y: 0.),
+             (x: 1., y: 1.),
+             (x: 0., y: 1.),
+        ];
+        let unrelated_polygon = polygon![
+             (x: 100., y: 100.),
+             (x: 150., y: 100.),
+             (x: 150., y: 150.),
+             (x: 100., y: 150.),
+        ];
+        let contained_polygon = polygon![
+             (x: 0.4, y: 0.4),
+             (x: 0.6, y: 0.4),
+             (x: 0.6, y: 0.6),
+             (x: 0.4, y: 0.6),
+        ];
+        let contained_contained_polygon = polygon![
+             (x: 0.45, y: 0.45),
+             (x: 0.55, y: 0.45),
+             (x: 0.55, y: 0.55),
+             (x: 0.45, y: 0.55),
+        ];
+
+        let multi_contains = MultiPolygon::new(vec![polygon.clone(), unrelated_polygon.clone()]);
+        let multi_contains_and_contained =
+            MultiPolygon::new(vec![polygon.clone(), contained_contained_polygon.clone()]);
+        let multi_contains_twice =
+            MultiPolygon::new(vec![polygon.clone(), contained_polygon.clone()]);
+        let multi_contained_twice = MultiPolygon::new(vec![
+            contained_polygon.clone(),
+            contained_contained_polygon.clone(),
+        ]);
+
+        let mut buf = Vec::new();
+        Zolygon::write_from_geometry(&mut buf, &polygon).unwrap();
+        let zolygon = Zolygon::from_bytes(&buf);
+        let mut buf = Vec::new();
+        Zolygon::write_from_geometry(&mut buf, &contained_polygon).unwrap();
+        let contained_zolygon = Zolygon::from_bytes(&buf);
+        let mut buf = Vec::new();
+        Zolygon::write_from_geometry(&mut buf, &unrelated_polygon).unwrap();
+        let unrelated_zolygon = Zolygon::from_bytes(&buf);
+
+        let mut buf = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buf, &multi_contains).unwrap();
+        let multi_contains = ZultiPolygons::from_bytes(&buf);
+        let mut buf = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buf, &multi_contains_and_contained).unwrap();
+        let multi_contains_and_contained = ZultiPolygons::from_bytes(&buf);
+        let mut buf = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buf, &multi_contains_twice).unwrap();
+        let multi_contains_twice = ZultiPolygons::from_bytes(&buf);
+        let mut buf = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buf, &multi_contained_twice).unwrap();
+        let multi_contained_twice = ZultiPolygons::from_bytes(&buf);
+
+        assert_compact_debug_snapshot!(multi_contains.all_relation(&contained_zolygon), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(multi_contains_and_contained.all_relation(&contained_zolygon), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(multi_contains_twice.all_relation(&contained_zolygon), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
+
+        assert_compact_debug_snapshot!(multi_contains_and_contained.all_relation(&unrelated_zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
+        assert_compact_debug_snapshot!(multi_contained_twice.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
+
+        assert_compact_debug_snapshot!(multi_contained_twice.all_relation(&multi_contains), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(multi_contains_and_contained.all_relation(&multi_contained_twice), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(true), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
     }
 }
