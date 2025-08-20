@@ -215,12 +215,13 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for ZultiLines<'a> {
                 return output;
             }
         }
+
+        if contained == self.len() {
+            output = output.make_strict_contains_if_set();
+        }
+
         if output.any_relation() {
-            if contained == self.len() {
-                output.make_strict_contains_if_set()
-            } else {
-                output
-            }
+            output
         } else {
             output.make_disjoint_if_set()
         }
@@ -237,26 +238,26 @@ impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for ZultiLines<'a> {
         }
         let mut contained = 0;
         for line in self.lines() {
-            let r = line.relation(other, relation.strip_strict().strip_disjoint());
-            output |= r;
-            if r.contained.unwrap_or_default() {
-                contained += 1;
-            }
+            for polygon in other.polygons() {
+                let r = line.relation(&polygon, relation.strip_strict().strip_disjoint());
+                dbg!(r);
+                output |= r;
+                if r.contained.unwrap_or_default() {
+                    contained += 1;
+                }
 
-            if output.any_relation() && relation.early_exit {
-                return output;
-            }
-
-            if output.any_relation() && relation.early_exit {
-                return output;
+                if output.any_relation() && relation.early_exit {
+                    return output;
+                }
             }
         }
+
+        if contained == self.len() {
+            output = output.make_strict_contained_if_set();
+        }
+
         if output.any_relation() {
-            if contained == self.len() {
-                output.make_strict_contains_if_set()
-            } else {
-                output
-            }
+            output
         } else {
             output.make_disjoint_if_set()
         }
@@ -281,7 +282,7 @@ impl PartialEq<MultiLineString> for ZultiLines<'_> {
 
 #[cfg(test)]
 mod tests {
-    use geo::LineString;
+    use geo::{LineString, MultiPolygon, coord, polygon};
     use geo_types::MultiLineString;
     use insta::{assert_compact_debug_snapshot, assert_debug_snapshot, assert_snapshot};
 
@@ -566,5 +567,100 @@ mod tests {
             zines: [],
         }
         ");
+    }
+
+    #[test]
+    fn test_multi_lines_and_multipolygon() {
+        let inside_line = LineString::new(vec![
+            coord! { x: 0.4, y: 0.4},
+            coord! { x: 0.6, y: 0.4},
+            coord! { x: 0.6, y: 0.6},
+            coord! { x: 0.4, y: 0.6},
+        ]);
+        let outside_line = LineString::new(vec![
+            coord! { x: -0.4, y: -0.4},
+            coord! { x: -0.6, y: -0.4},
+            coord! { x: -0.6, y: -0.6},
+            coord! { x: -0.4, y: -0.6},
+        ]);
+        let inside = polygon![
+             (x: 0., y: 0.),
+             (x: 1., y: 0.),
+             (x: 1., y: 1.),
+             (x: 0., y: 1.),
+        ];
+        let outside = polygon![
+             (x: 5., y: 5.),
+             (x: 6., y: 5.),
+             (x: 6., y: 6.),
+             (x: 5., y: 6.),
+        ];
+        let intersect = polygon![
+             (x: 0.5, y: 0.5),
+             (x: 0.6, y: 0.5),
+             (x: 0.6, y: 0.6),
+             (x: 0.5, y: 0.6),
+        ];
+        let multi_line_strict_inside =
+            MultiLineString::new(vec![inside_line.clone(), inside_line.clone()]);
+        let multi_line_outside =
+            MultiLineString::new(vec![outside_line.clone(), outside_line.clone()]);
+        let multi_line_inside = MultiLineString::new(vec![outside_line, inside_line]);
+
+        let multi_polygons_inside = MultiPolygon::new(vec![inside.clone()]);
+        let multi_polygons_outside = MultiPolygon::new(vec![outside.clone()]);
+        let multi_polygons_intersect = MultiPolygon::new(vec![intersect.clone()]);
+        let multi_polygons_in_and_out = MultiPolygon::new(vec![inside.clone(), outside.clone()]);
+        let multi_polygons_all =
+            MultiPolygon::new(vec![inside.clone(), outside.clone(), intersect.clone()]);
+
+        let mut buf = Vec::new();
+        ZultiLines::write_from_geometry(&mut buf, &multi_line_strict_inside).unwrap();
+        let multi_line_strict_inside = ZultiLines::from_bytes(&buf);
+
+        let mut buf = Vec::new();
+        ZultiLines::write_from_geometry(&mut buf, &multi_line_outside).unwrap();
+        let multi_line_outside = ZultiLines::from_bytes(&buf);
+
+        let mut buf = Vec::new();
+        ZultiLines::write_from_geometry(&mut buf, &multi_line_inside).unwrap();
+        let multi_line_inside = ZultiLines::from_bytes(&buf);
+
+        let mut buf = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_inside).unwrap();
+        let multi_polygons_inside = ZultiPolygons::from_bytes(&buf);
+        let mut buf = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_outside).unwrap();
+        let multi_polygons_outside = ZultiPolygons::from_bytes(&buf);
+        let mut buf = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_intersect).unwrap();
+        let multi_polygons_intersect = ZultiPolygons::from_bytes(&buf);
+        let mut buf = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_in_and_out).unwrap();
+        let multi_polygons_in_and_out = ZultiPolygons::from_bytes(&buf);
+        let mut buf = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_all).unwrap();
+        let multi_polygons_all = ZultiPolygons::from_bytes(&buf);
+
+        assert_compact_debug_snapshot!(multi_line_strict_inside.all_relation(&multi_polygons_inside), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(multi_line_strict_inside.all_relation(&multi_polygons_outside), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
+        assert_compact_debug_snapshot!(multi_line_strict_inside.all_relation(&multi_polygons_intersect), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(multi_line_strict_inside.all_relation(&multi_polygons_in_and_out), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(multi_line_strict_inside.all_relation(&multi_polygons_all), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(true), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(multi_line_strict_inside.any_relation(&multi_polygons_all), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+
+        assert_compact_debug_snapshot!(multi_line_outside.all_relation(&multi_polygons_inside), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
+        assert_compact_debug_snapshot!(multi_line_outside.all_relation(&multi_polygons_outside), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
+        assert_compact_debug_snapshot!(multi_line_outside.all_relation(&multi_polygons_intersect), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
+        assert_compact_debug_snapshot!(multi_line_outside.all_relation(&multi_polygons_in_and_out), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
+        assert_compact_debug_snapshot!(multi_line_outside.all_relation(&multi_polygons_all), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
+        assert_compact_debug_snapshot!(multi_line_outside.any_relation(&multi_polygons_all), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
+
+        assert_compact_debug_snapshot!(multi_line_inside.all_relation(&multi_polygons_inside), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(multi_line_inside.all_relation(&multi_polygons_outside), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
+        assert_compact_debug_snapshot!(multi_line_inside.all_relation(&multi_polygons_intersect), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(multi_line_inside.all_relation(&multi_polygons_in_and_out), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(multi_line_inside.all_relation(&multi_polygons_all), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(multi_line_inside.any_relation(&multi_polygons_all), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
     }
 }

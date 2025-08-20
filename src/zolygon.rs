@@ -123,9 +123,9 @@ impl<'a> RelationBetweenShapes<Coord> for Zolygon<'a> {
         }
 
         if intersections % 2 == 0 {
-            return relation.to_false().make_disjoint_if_set();
+            relation.to_false().make_disjoint_if_set()
         } else {
-            return relation.to_false().make_strict_contains_if_set();
+            relation.to_false().make_strict_contains_if_set()
         }
     }
 }
@@ -270,7 +270,7 @@ impl<'a> PartialEq<Polygon<f64>> for Zolygon<'a> {
 #[cfg(test)]
 mod tests {
     use bytemuck::cast_slice;
-    use geo::{MultiPoint, coord, point, polygon};
+    use geo::{MultiPoint, point, polygon};
     use geo_types::{LineString, Point};
     use insta::{assert_compact_debug_snapshot, assert_debug_snapshot};
 

@@ -151,7 +151,7 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zine<'a> {
         // safe to unwrap because we checked that the polygon and line are not empty
         let any = self.coords().iter().next().unwrap();
         if other.contains(any) {
-            return relation.to_false().make_strict_contains_if_set();
+            return relation.to_false().make_strict_contained_if_set();
         }
 
         relation.to_false().make_disjoint_if_set()
@@ -252,7 +252,7 @@ mod tests {
         Zolygon::write_from_geometry(&mut buf, &polygon).unwrap();
         let zolygon = Zolygon::from_bytes(&buf);
 
-        assert_compact_debug_snapshot!(zine.all_relation(&zolygon), @"");
+        assert_compact_debug_snapshot!(zine.all_relation(&zolygon), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
     }
 
     #[test]
