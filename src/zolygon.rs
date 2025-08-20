@@ -159,7 +159,11 @@ impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zolygon<'a> {
         }
 
         if contains == other.len() {
-            output.make_strict_contains_if_set()
+            output = output.make_strict_contains_if_set();
+        }
+
+        if output.any_relation() {
+            output
         } else {
             output.make_disjoint_if_set()
         }
@@ -266,6 +270,7 @@ impl<'a> PartialEq<Polygon<f64>> for Zolygon<'a> {
 #[cfg(test)]
 mod tests {
     use bytemuck::cast_slice;
+    use geo::{MultiPoint, coord, point, polygon};
     use geo_types::{LineString, Point};
     use insta::{assert_compact_debug_snapshot, assert_debug_snapshot};
 
@@ -671,6 +676,74 @@ mod tests {
             second_zolygon.all_relation(&first_zolygon),
             @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }"
         );
+    }
+
+    #[test]
+    fn test_multi_points_and_polygon() {
+        let polygon = polygon![
+             (x: 0., y: 0.),
+             (x: 1., y: 0.),
+             (x: 1., y: 1.),
+             (x: 0., y: 1.),
+        ];
+
+        let mut buf = Vec::new();
+        Zolygon::write_from_geometry(&mut buf, &polygon).unwrap();
+        let zolygon = Zolygon::from_bytes(&buf);
+
+        let inside = point! { x: 0.5, y: 0.5};
+        let inside2 = point! { x: 0.6, y: 0.6};
+        let outside = point! { x: 1.5, y: 1.5};
+        let outside2 = point! { x: 1.6, y: 1.6};
+
+        let mp_strict_inside = MultiPoint::new(vec![inside]);
+        let mp_strict_inside_2 = MultiPoint::new(vec![inside, inside2]);
+        let mp_strict_outside = MultiPoint::new(vec![outside]);
+        let mp_strict_outside_2 = MultiPoint::new(vec![outside, outside2]);
+        let mp_inside = MultiPoint::new(vec![inside, outside]);
+        let mp_inside2 = MultiPoint::new(vec![inside, inside2, outside]);
+        let mp_inside4 = MultiPoint::new(vec![inside, outside, outside2]);
+        let mp_inside3 = MultiPoint::new(vec![inside, inside2, outside, outside2]);
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_strict_inside).unwrap();
+        let mp_strict_inside = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_strict_inside.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_strict_inside_2).unwrap();
+        let mp_strict_inside_2 = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_strict_inside_2.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_strict_outside).unwrap();
+        let mp_strict_outside = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_strict_outside.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_strict_outside_2).unwrap();
+        let mp_strict_outside_2 = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_strict_outside_2.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_inside).unwrap();
+        let mp_inside = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_inside.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_inside2).unwrap();
+        let mp_inside2 = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_inside2.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_inside4).unwrap();
+        let mp_inside4 = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_inside4.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_inside3).unwrap();
+        let mp_inside3 = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_inside3.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
     }
 
     // Prop test ensuring we can round trip from a polygon to a zolygon and back to a polygon

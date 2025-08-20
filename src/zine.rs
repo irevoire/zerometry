@@ -316,6 +316,7 @@ mod tests {
         ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_all).unwrap();
         let multi_polygons_all = ZultiPolygons::from_bytes(&buf);
         assert_compact_debug_snapshot!(zine.all_relation(&multi_polygons_all), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(zine.any_relation(&multi_polygons_all), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
     }
 
     // Prop test ensuring we can round trip from a multi-point to a zulti-points and back to a multi-point
