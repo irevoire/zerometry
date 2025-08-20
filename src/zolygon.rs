@@ -584,11 +584,11 @@ mod tests {
         let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
         assert_compact_debug_snapshot!(
             first_zolygon.all_relation(&second_zolygon),
-            @"OutputRelation { contains: Some(true), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }"
+            @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }"
         );
         assert_compact_debug_snapshot!(
             second_zolygon.all_relation(&first_zolygon),
-            @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }"
+            @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }"
         );
     }
 

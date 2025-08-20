@@ -252,7 +252,7 @@ mod tests {
         Zolygon::write_from_geometry(&mut buf, &polygon).unwrap();
         let zolygon = Zolygon::from_bytes(&buf);
 
-        assert_compact_debug_snapshot!(zine.all_relation(&zolygon), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(zine.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
     }
 
     #[test]
@@ -295,7 +295,7 @@ mod tests {
         let mut buf = Vec::new();
         ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_inside).unwrap();
         let inside = ZultiPolygons::from_bytes(&buf);
-        assert_compact_debug_snapshot!(zine.all_relation(&inside ), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(zine.all_relation(&inside ), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
 
         let mut buf = Vec::new();
         ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_outside).unwrap();
@@ -310,13 +310,13 @@ mod tests {
         let mut buf = Vec::new();
         ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_in_and_out).unwrap();
         let multi_polygons_in_and_out = ZultiPolygons::from_bytes(&buf);
-        assert_compact_debug_snapshot!(zine.all_relation(&multi_polygons_in_and_out), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(zine.all_relation(&multi_polygons_in_and_out), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
 
         let mut buf = Vec::new();
         ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_all).unwrap();
         let multi_polygons_all = ZultiPolygons::from_bytes(&buf);
-        assert_compact_debug_snapshot!(zine.all_relation(&multi_polygons_all), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
-        assert_compact_debug_snapshot!(zine.any_relation(&multi_polygons_all), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(zine.all_relation(&multi_polygons_all), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(true), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(zine.any_relation(&multi_polygons_all), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
     }
 
     // Prop test ensuring we can round trip from a multi-point to a zulti-points and back to a multi-point
