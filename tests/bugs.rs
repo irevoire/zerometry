@@ -1,7 +1,8 @@
 use std::str::FromStr;
 
 use geo::{LineString, Polygon};
-use zerometry::{Relation, RelationBetweenShapes, Zerometry, Zolygon};
+use insta::assert_compact_debug_snapshot;
+use zerometry::{OutputRelation, RelationBetweenShapes, Zerometry, Zolygon};
 
 const BREAU_ET_SALAGOSSE: &str = include_str!("assets/breau-et-salagosse.geojson");
 
@@ -66,17 +67,15 @@ fn bug_breo_et_salagosse() {
 
     let query_bb = query.bounding_box();
     let breau_bb = breau.to_polygon().unwrap().bounding_box();
-    assert_eq!(
-        query_bb.relation(breau_bb),
-        Relation::Intersects,
-        "\n{query_bb:?}\n{breau_bb:?}"
+    assert_compact_debug_snapshot!(
+        query_bb.all_relation(breau_bb),
+        @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }"
     );
-    assert_eq!(
-        breau_bb.relation(query_bb),
-        Relation::Intersects,
-        "\n{breau_bb:?}\n{query_bb:?}"
+    assert_compact_debug_snapshot!(
+        breau_bb.all_relation(query_bb),
+        @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }"
     );
 
-    assert_eq!(breau.relation(&query), Relation::Intersects);
-    assert_eq!(query.relation(&breau), Relation::Intersects);
+    assert_compact_debug_snapshot!(breau.all_relation(&query), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
+    assert_compact_debug_snapshot!(query.all_relation(&breau), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
 }

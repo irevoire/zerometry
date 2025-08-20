@@ -4,8 +4,8 @@ use std::io::{self, Write};
 use geo_types::Point;
 
 use crate::{
-    Coord, Relation, RelationBetweenShapes, Zerometry, Zolygon, ZultiPoints, ZultiPolygons,
-    zine::Zine, zulti_lines::ZultiLines,
+    Coord, InputRelation, OutputRelation, RelationBetweenShapes, Zerometry, Zolygon, ZultiPoints,
+    ZultiPolygons, zine::Zine, zulti_lines::ZultiLines,
 };
 
 #[derive(Clone, Copy)]
@@ -72,59 +72,55 @@ impl PartialEq<geo_types::Point<f64>> for Zoint<'_> {
 
 // A point cannot contains or intersect with another point
 impl<'a> RelationBetweenShapes<Zoint<'a>> for Zoint<'a> {
-    fn relation(&self, _other: &Zoint<'a>) -> Relation {
-        Relation::Disjoint
+    fn relation(&self, _other: &Zoint<'a>, relation: InputRelation) -> OutputRelation {
+        relation.to_false().make_disjoint_if_set()
     }
 }
 
 // A point cannot contains or intersect with a multi point
 impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zoint<'a> {
-    fn relation(&self, _other: &ZultiPoints<'a>) -> Relation {
-        Relation::Disjoint
+    fn relation(&self, _other: &ZultiPoints<'a>, relation: InputRelation) -> OutputRelation {
+        relation.to_false().make_disjoint_if_set()
     }
 }
 
 // A point cannot contains or intersect with a line
 impl<'a> RelationBetweenShapes<Zine<'a>> for Zoint<'a> {
-    fn relation(&self, _other: &Zine<'a>) -> Relation {
-        Relation::Disjoint
+    fn relation(&self, _other: &Zine<'a>, relation: InputRelation) -> OutputRelation {
+        relation.to_false().make_disjoint_if_set()
     }
 }
 
 // A point cannot contains or intersect with a line
 impl<'a> RelationBetweenShapes<ZultiLines<'a>> for Zoint<'a> {
-    fn relation(&self, _other: &ZultiLines<'a>) -> Relation {
-        Relation::Disjoint
+    fn relation(&self, _other: &ZultiLines<'a>, relation: InputRelation) -> OutputRelation {
+        relation.to_false().make_disjoint_if_set()
     }
 }
 
 impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zoint<'a> {
-    fn relation(&self, other: &Zolygon<'a>) -> Relation {
-        if other.relation(self) == Relation::Contains {
-            Relation::Contained
+    fn relation(&self, other: &Zolygon<'a>, relation: InputRelation) -> OutputRelation {
+        if other.strict_contains(self) {
+            relation.to_false().make_strict_contained_if_set()
         } else {
-            Relation::Disjoint
+            relation.to_false().make_disjoint_if_set()
         }
     }
 }
 
 impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for Zoint<'a> {
-    fn relation(&self, other: &ZultiPolygons<'a>) -> Relation {
-        match other.relation(self) {
-            Relation::Contains => Relation::Contained,
-            Relation::Contained => Relation::Contains,
-            r => r,
-        }
+    fn relation(&self, other: &ZultiPolygons<'a>, relation: InputRelation) -> OutputRelation {
+        other
+            .relation(self, relation.swap_contains_relation())
+            .swap_contains_relation()
     }
 }
 
 impl<'a> RelationBetweenShapes<Zerometry<'a>> for Zoint<'a> {
-    fn relation(&self, other: &Zerometry<'a>) -> Relation {
-        match other.relation(self) {
-            Relation::Contains => Relation::Contained,
-            Relation::Contained => Relation::Contains,
-            r => r,
-        }
+    fn relation(&self, other: &Zerometry<'a>, relation: InputRelation) -> OutputRelation {
+        other
+            .relation(self, relation.swap_contains_relation())
+            .swap_contains_relation()
     }
 }
 

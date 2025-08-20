@@ -1,4 +1,6 @@
-use crate::{Coord, Relation, RelationBetweenShapes, Zerometry, Zoint};
+use insta::assert_compact_debug_snapshot;
+
+use crate::{Coord, InputRelation, OutputRelation, RelationBetweenShapes, Zerometry, Zoint};
 
 #[test]
 fn test_mono_multipolygon_contains_points() {
@@ -27,8 +29,8 @@ fn test_mono_multipolygon_contains_points() {
     )
     .unwrap();
     let wrong_multipolygon = Zerometry::from_bytes(&wrong_buffer).unwrap();
-    let wrong = wrong_multipolygon.relation(&point);
-    assert_eq!(wrong, Relation::Disjoint);
+    let wrong = wrong_multipolygon.all_relation(&point);
+    assert_compact_debug_snapshot!(wrong, @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
 
     let right_multipolygon = geo_types::MultiPolygon::new(vec![geo_types::Polygon::new(
         geo_types::LineString::from(vec![
@@ -53,8 +55,8 @@ fn test_mono_multipolygon_contains_points() {
     let right_multipolygon = Zerometry::from_bytes(&right_buffer).unwrap();
     println!("right_multipolygon: {}", print_geojson(&right_multipolygon));
 
-    let right = right_multipolygon.relation(&point);
-    assert_eq!(right, Relation::Contains);
+    let right = right_multipolygon.all_relation(&point);
+    assert_compact_debug_snapshot!(right, @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
 }
 
 fn print_geojson(geometry: &Zerometry) -> String {

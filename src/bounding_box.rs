@@ -7,7 +7,9 @@ use std::{
 
 use geo_types::Point;
 
-use crate::{COORD_SIZE_IN_BYTES, Coord, Coords, Relation, RelationBetweenShapes};
+use crate::{
+    COORD_SIZE_IN_BYTES, Coord, Coords, InputRelation, OutputRelation, RelationBetweenShapes,
+};
 
 pub(crate) const BOUNDING_BOX_SIZE_IN_BYTES: usize = COORD_SIZE_IN_BYTES * 2;
 
@@ -160,17 +162,19 @@ impl fmt::Debug for BoundingBox {
 }
 
 impl RelationBetweenShapes<Coord> for BoundingBox {
-    fn relation(&self, other: &Coord) -> Relation {
+    fn relation(&self, other: &Coord, relation: InputRelation) -> OutputRelation {
         if self.contains_coord(other) {
-            Relation::Contains
+            relation.to_false().make_strict_contains_if_set()
         } else {
-            Relation::Disjoint
+            relation.to_false().make_disjoint_if_set()
         }
     }
 }
 
 impl RelationBetweenShapes<BoundingBox> for BoundingBox {
-    fn relation(&self, other: &BoundingBox) -> Relation {
+    fn relation(&self, other: &BoundingBox, relation: InputRelation) -> OutputRelation {
+        let relation = relation.to_false();
+
         let self_vertical_range = self.vertical_range();
         let self_horizontal_range = self.horizontal_range();
         let other_vertical_range = other.vertical_range();
@@ -182,7 +186,7 @@ impl RelationBetweenShapes<BoundingBox> for BoundingBox {
             self_horizontal_range.contains(other_horizontal_range.start()),
             self_horizontal_range.contains(other_horizontal_range.end()),
         ) {
-            (true, true, true, true) => Relation::Contains,
+            (true, true, true, true) => relation.make_strict_contains_if_set(),
             (false, false, false, false) => {
                 match (
                     other_vertical_range.contains(self_vertical_range.start()),
@@ -190,12 +194,12 @@ impl RelationBetweenShapes<BoundingBox> for BoundingBox {
                     other_horizontal_range.contains(self_horizontal_range.start()),
                     other_horizontal_range.contains(self_horizontal_range.end()),
                 ) {
-                    (true, true, true, true) => Relation::Contained,
-                    (false, false, false, false) => Relation::Disjoint,
-                    _ => Relation::Intersects,
+                    (true, true, true, true) => relation.make_strict_contained_if_set(),
+                    (false, false, false, false) => relation.make_disjoint_if_set(),
+                    _ => relation.make_intersect_if_set(),
                 }
             }
-            _ => Relation::Intersects,
+            _ => relation.make_intersect_if_set(),
         }
     }
 }
@@ -301,54 +305,21 @@ mod tests {
     #[test]
     fn test_bounding_box_relation_to_coord() {
         let bb = BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0]);
-        assert_eq!(
-            bb.relation(Coord::from_slice(&[2.0, 3.0])),
-            Relation::Contains
-        );
-        assert_eq!(
-            bb.relation(Coord::from_slice(&[0.0, 0.0])),
-            Relation::Contains
-        );
-        assert_eq!(
-            bb.relation(Coord::from_slice(&[10.0, 10.0])),
-            Relation::Contains
-        );
-        assert_eq!(
-            bb.relation(Coord::from_slice(&[11.0, 11.0])),
-            Relation::Disjoint
-        );
-        assert_eq!(
-            bb.relation(Coord::from_slice(&[-1.0, -1.0])),
-            Relation::Disjoint
-        );
+        assert!(bb.contains(Coord::from_slice(&[2.0, 3.0])));
+        assert!(bb.contains(Coord::from_slice(&[0.0, 0.0])));
+        assert!(bb.contains(Coord::from_slice(&[10.0, 10.0])));
+        assert!(bb.disjoint(Coord::from_slice(&[11.0, 11.0])));
+        assert!(bb.disjoint(Coord::from_slice(&[-1.0, -1.0])));
     }
 
     #[test]
     fn test_bounding_box_relation_to_bounding_box() {
         let bb = BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0]);
-        assert_eq!(
-            bb.relation(BoundingBox::from_slice(&[1.0, 1.0, 3.0, 3.0])),
-            Relation::Contains
-        );
-        assert_eq!(
-            bb.relation(BoundingBox::from_slice(&[-1.0, 0.0, 1.0, 2.0])),
-            Relation::Intersects
-        );
-        assert_eq!(
-            bb.relation(BoundingBox::from_slice(&[10.0, 0.0, 20.0, 10.0])),
-            Relation::Intersects
-        );
-        assert_eq!(
-            bb.relation(BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0])),
-            Relation::Contains
-        );
-        assert_eq!(
-            bb.relation(BoundingBox::from_slice(&[-1.0, -1.0, 11.0, 11.0])),
-            Relation::Contained
-        );
-        assert_eq!(
-            bb.relation(BoundingBox::from_slice(&[11.0, 11.0, 12.0, 12.0])),
-            Relation::Disjoint
-        );
+        assert!(bb.contains(BoundingBox::from_slice(&[1.0, 1.0, 3.0, 3.0])));
+        assert!(bb.intersects(BoundingBox::from_slice(&[-1.0, 0.0, 1.0, 2.0])));
+        assert!(bb.intersects(BoundingBox::from_slice(&[10.0, 0.0, 20.0, 10.0])));
+        assert!(bb.contains(BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0])));
+        assert!(bb.contained(BoundingBox::from_slice(&[-1.0, -1.0, 11.0, 11.0])));
+        assert!(bb.disjoint(BoundingBox::from_slice(&[11.0, 11.0, 12.0, 12.0])));
     }
 }

@@ -4,8 +4,8 @@ use std::io::{self, Write};
 use geo::{LineString, Point};
 
 use crate::{
-    BoundingBox, COORD_SIZE_IN_BYTES, Coords, Relation, RelationBetweenShapes, Segment, Zerometry,
-    Zoint, Zolygon, ZultiPoints, ZultiPolygons, zulti_lines::ZultiLines,
+    BoundingBox, COORD_SIZE_IN_BYTES, Coords, InputRelation, OutputRelation, RelationBetweenShapes,
+    Segment, Zerometry, Zoint, Zolygon, ZultiPoints, ZultiPolygons, zulti_lines::ZultiLines,
 };
 
 #[derive(Clone, Copy)]
@@ -90,53 +90,50 @@ impl<'a> fmt::Debug for Zine<'a> {
 
 // A point cannot contains or intersect with anything
 impl<'a> RelationBetweenShapes<Zoint<'a>> for Zine<'a> {
-    fn relation(&self, _other: &Zoint<'a>) -> Relation {
-        Relation::Disjoint
+    fn relation(&self, _other: &Zoint<'a>, relation: InputRelation) -> OutputRelation {
+        relation.to_false().make_disjoint_if_set()
     }
 }
 
 // A point cannot contains or intersect with anything
 impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zine<'a> {
-    fn relation(&self, _other: &ZultiPoints<'a>) -> Relation {
-        Relation::Disjoint
+    fn relation(&self, _other: &ZultiPoints<'a>, relation: InputRelation) -> OutputRelation {
+        relation.to_false().make_disjoint_if_set()
     }
 }
 
 impl<'a> RelationBetweenShapes<Zine<'a>> for Zine<'a> {
-    fn relation(&self, other: &Zine<'a>) -> Relation {
-        if self.is_empty()
-            || other.is_empty()
-            || self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint
+    fn relation(&self, other: &Zine<'a>, relation: InputRelation) -> OutputRelation {
+        let relation = relation.to_false();
+        if self.is_empty() || other.is_empty() || self.bounding_box().disjoint(other.bounding_box())
         {
-            return Relation::Disjoint;
+            return relation.make_disjoint_if_set();
         }
 
         for lhs in self.segments() {
             for rhs in other.segments() {
                 if lhs.intersects(&rhs) {
-                    return Relation::Intersects;
+                    return relation.make_intersect_if_set();
                 }
             }
         }
 
-        Relation::Disjoint
+        relation.make_disjoint_if_set()
     }
 }
 
 impl<'a> RelationBetweenShapes<ZultiLines<'a>> for Zine<'a> {
-    fn relation(&self, other: &ZultiLines<'a>) -> Relation {
-        // no need to revert the contains/contained as this connot happens with lines
-        other.relation(self)
+    fn relation(&self, other: &ZultiLines<'a>, relation: InputRelation) -> OutputRelation {
+        // no need to revert the contains/contained as this cannot happens with lines
+        other.relation(self, relation)
     }
 }
 
 impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zine<'a> {
-    fn relation(&self, other: &Zolygon<'a>) -> Relation {
-        if self.is_empty()
-            || other.is_empty()
-            || self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint
+    fn relation(&self, other: &Zolygon<'a>, relation: InputRelation) -> OutputRelation {
+        if self.is_empty() || other.is_empty() || self.bounding_box().disjoint(other.bounding_box())
         {
-            return Relation::Disjoint;
+            return relation.to_false().make_disjoint_if_set();
         }
 
         // To know if a line and a polygon intersect we check if any of our segments intersect with the polygon.
@@ -144,7 +141,7 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zine<'a> {
         for segment in self.segments() {
             for other_segment in other.segments() {
                 if segment.intersects(&other_segment) {
-                    return Relation::Intersects;
+                    return relation.to_false().make_intersect_if_set();
                 }
             }
         }
@@ -153,44 +150,47 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zine<'a> {
         // is contained in the polygon we check if any of its points is contained in the polygon.
         // safe to unwrap because we checked that the polygon and line are not empty
         let any = self.coords().iter().next().unwrap();
-        if other.relation(any) == Relation::Contains {
-            return Relation::Contained;
+        if other.contains(any) {
+            return relation.to_false().make_strict_contained_if_set();
         }
 
-        Relation::Disjoint
+        relation.to_false().make_disjoint_if_set()
     }
 }
 
 impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for Zine<'a> {
-    fn relation(&self, other: &ZultiPolygons<'a>) -> Relation {
-        if self.is_empty()
-            || other.is_empty()
-            || self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint
+    fn relation(&self, other: &ZultiPolygons<'a>, relation: InputRelation) -> OutputRelation {
+        let mut output = relation.to_false();
+        if self.is_empty() || other.is_empty() || self.bounding_box().disjoint(other.bounding_box())
         {
-            return Relation::Disjoint;
+            return output.make_disjoint_if_set();
         }
 
         for polygon in other.polygons() {
-            match self.relation(&polygon) {
-                Relation::Intersects => return Relation::Intersects,
-                Relation::Contains => return Relation::Contains,
-                _ => (),
+            output |= self.relation(&polygon, relation.strip_disjoint());
+
+            if output.any_relation() && relation.early_exit {
+                return output;
             }
         }
 
-        Relation::Disjoint
+        if output.any_relation() {
+            output
+        } else {
+            output.make_disjoint_if_set()
+        }
     }
 }
 
 impl<'a> RelationBetweenShapes<Zerometry<'a>> for Zine<'a> {
-    fn relation(&self, other: &Zerometry<'a>) -> Relation {
+    fn relation(&self, other: &Zerometry<'a>, relation: InputRelation) -> OutputRelation {
         match other {
-            Zerometry::Point(zoint) => self.relation(zoint),
-            Zerometry::MultiPoints(zulti_points) => self.relation(zulti_points),
-            Zerometry::Line(zine) => self.relation(zine),
-            Zerometry::MultiLines(zulti_lines) => self.relation(zulti_lines),
-            Zerometry::Polygon(zolygon) => self.relation(zolygon),
-            Zerometry::MultiPolygon(zulti_polygon) => self.relation(zulti_polygon),
+            Zerometry::Point(zoint) => self.relation(zoint, relation),
+            Zerometry::MultiPoints(zulti_points) => self.relation(zulti_points, relation),
+            Zerometry::Line(zine) => self.relation(zine, relation),
+            Zerometry::MultiLines(zulti_lines) => self.relation(zulti_lines, relation),
+            Zerometry::Polygon(zolygon) => self.relation(zolygon, relation),
+            Zerometry::MultiPolygon(zulti_polygon) => self.relation(zulti_polygon, relation),
             Zerometry::Collection(zollection) => todo!(),
         }
     }
@@ -208,6 +208,7 @@ impl<'a> PartialEq<LineString<f64>> for Zine<'a> {
 #[cfg(test)]
 mod tests {
     use bytemuck::cast_slice;
+    use geo::{MultiPolygon, coord, polygon};
     use geo_types::Point;
     use insta::assert_compact_debug_snapshot;
 
@@ -226,6 +227,96 @@ mod tests {
         let zulti_points = Zine::from_bytes(&buffer);
         assert_compact_debug_snapshot!(zulti_points.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 1.0, y: 2.0 }, top_right: Coord { x: 3.0, y: 4.0 } }");
         assert_compact_debug_snapshot!(zulti_points.coords(), @"[Coord { x: 1.0, y: 2.0 }, Coord { x: 3.0, y: 4.0 }]");
+    }
+
+    #[test]
+    fn test_zine_in_polygon() {
+        let line = LineString::new(vec![
+            coord! { x: 0.4, y: 0.4},
+            coord! { x: 0.6, y: 0.4},
+            coord! { x: 0.6, y: 0.6},
+            coord! { x: 0.4, y: 0.6},
+        ]);
+        let polygon = polygon![
+             (x: 0., y: 0.),
+             (x: 1., y: 0.),
+             (x: 1., y: 1.),
+             (x: 0., y: 1.),
+        ];
+
+        let mut buf = Vec::new();
+        Zine::write_from_geometry(&mut buf, &line).unwrap();
+        let zine = Zine::from_bytes(&buf);
+
+        let mut buf = Vec::new();
+        Zolygon::write_from_geometry(&mut buf, &polygon).unwrap();
+        let zolygon = Zolygon::from_bytes(&buf);
+
+        assert_compact_debug_snapshot!(zine.all_relation(&zolygon), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+    }
+
+    #[test]
+    fn test_zine_and_multipolygon() {
+        let line = LineString::new(vec![
+            coord! { x: 0.4, y: 0.4},
+            coord! { x: 0.6, y: 0.4},
+            coord! { x: 0.6, y: 0.6},
+            coord! { x: 0.4, y: 0.6},
+        ]);
+        let inside = polygon![
+             (x: 0., y: 0.),
+             (x: 1., y: 0.),
+             (x: 1., y: 1.),
+             (x: 0., y: 1.),
+        ];
+        let outside = polygon![
+             (x: 5., y: 5.),
+             (x: 6., y: 5.),
+             (x: 6., y: 6.),
+             (x: 5., y: 6.),
+        ];
+        let intersect = polygon![
+             (x: 0.5, y: 0.5),
+             (x: 0.6, y: 0.5),
+             (x: 0.6, y: 0.6),
+             (x: 0.5, y: 0.6),
+        ];
+        let multi_polygons_inside = MultiPolygon::new(vec![inside.clone()]);
+        let multi_polygons_outside = MultiPolygon::new(vec![outside.clone()]);
+        let multi_polygons_intersect = MultiPolygon::new(vec![intersect.clone()]);
+        let multi_polygons_in_and_out = MultiPolygon::new(vec![inside.clone(), outside.clone()]);
+        let multi_polygons_all =
+            MultiPolygon::new(vec![inside.clone(), outside.clone(), intersect.clone()]);
+
+        let mut buf = Vec::new();
+        Zine::write_from_geometry(&mut buf, &line).unwrap();
+        let zine = Zine::from_bytes(&buf);
+
+        let mut buf = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_inside).unwrap();
+        let inside = ZultiPolygons::from_bytes(&buf);
+        assert_compact_debug_snapshot!(zine.all_relation(&inside ), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_outside).unwrap();
+        let multi_polygons_outside = ZultiPolygons::from_bytes(&buf);
+        assert_compact_debug_snapshot!(zine.all_relation(&multi_polygons_outside), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
+
+        let mut buf = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_intersect).unwrap();
+        let multi_polygons_intersect = ZultiPolygons::from_bytes(&buf);
+        assert_compact_debug_snapshot!(zine.all_relation(&multi_polygons_intersect), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_in_and_out).unwrap();
+        let multi_polygons_in_and_out = ZultiPolygons::from_bytes(&buf);
+        assert_compact_debug_snapshot!(zine.all_relation(&multi_polygons_in_and_out), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_all).unwrap();
+        let multi_polygons_all = ZultiPolygons::from_bytes(&buf);
+        assert_compact_debug_snapshot!(zine.all_relation(&multi_polygons_all), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(zine.any_relation(&multi_polygons_all), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
     }
 
     // Prop test ensuring we can round trip from a multi-point to a zulti-points and back to a multi-point

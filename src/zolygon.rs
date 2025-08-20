@@ -4,9 +4,9 @@ use std::io::{self, Write};
 use geo_types::{Geometry, Polygon};
 
 use crate::{
-    BoundingBox, COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS, Coord, Coords, Relation,
-    RelationBetweenShapes, Segment, Zerometry, Zoint, ZultiLines, ZultiPoints, ZultiPolygons,
-    zine::Zine,
+    BoundingBox, COORD_SIZE_IN_BYTES, COORD_SIZE_IN_FLOATS, Coord, Coords, InputRelation,
+    OutputRelation, RelationBetweenShapes, Segment, Zerometry, Zoint, ZultiLines, ZultiPoints,
+    ZultiPolygons, zine::Zine,
 };
 
 /// A polygon is a closed shape defined by a list of coordinates.
@@ -99,18 +99,13 @@ impl<'a> fmt::Debug for Zolygon<'a> {
 }
 
 impl<'a> RelationBetweenShapes<Coord> for Zolygon<'a> {
-    fn relation(&self, other: &Coord) -> Relation {
-        if self.is_empty() {
-            return Relation::Disjoint;
-        }
-
-        // If the point is outside of the bounding box, we can early return it's definitely not IN the polygon
-        if !self.bounding_box.contains_coord(other) {
-            return Relation::Disjoint;
+    fn relation(&self, other: &Coord, relation: InputRelation) -> OutputRelation {
+        if self.is_empty() || !self.bounding_box.contains_coord(other) {
+            return relation.to_false().make_disjoint_if_set();
         }
 
         // To find if a point is in a polygon we draw a ray from outside of the polygon to the point
-        // and count the number of times the ray intersects with the polygon. In it's even it means
+        // and count the number of times the ray intersects with the polygon. If it's even it means
         // the point is outside of the polygon, otherwise it's inside.
         let end = other;
         let mut buffer = [0.0; COORD_SIZE_IN_FLOATS];
@@ -128,61 +123,76 @@ impl<'a> RelationBetweenShapes<Coord> for Zolygon<'a> {
         }
 
         if intersections % 2 == 0 {
-            Relation::Disjoint
+            relation.to_false().make_disjoint_if_set()
         } else {
-            Relation::Contains
+            relation.to_false().make_strict_contains_if_set()
         }
     }
 }
 
 impl<'a> RelationBetweenShapes<Zoint<'a>> for Zolygon<'a> {
-    fn relation(&self, other: &Zoint<'a>) -> Relation {
-        self.relation(other.coord())
+    fn relation(&self, other: &Zoint<'a>, relation: InputRelation) -> OutputRelation {
+        self.relation(other.coord(), relation)
     }
 }
 
 // We don't need to know if everything is contained, only one point is enough for us.
 impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zolygon<'a> {
-    fn relation(&self, other: &ZultiPoints<'a>) -> Relation {
+    fn relation(&self, other: &ZultiPoints<'a>, relation: InputRelation) -> OutputRelation {
+        let mut output = relation.to_false();
+
         // If the bounding boxes are disjoint, the relation must be disjoint, we can early return.
-        if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
-            return Relation::Disjoint;
+        if self.bounding_box().disjoint(other.bounding_box()) {
+            return output.make_disjoint_if_set();
         }
 
+        let mut contains = 0;
+
         for coord in other.coords().iter() {
-            if self.relation(coord) == Relation::Contains {
-                return Relation::Contains;
+            if self.contains(coord) {
+                contains += 1;
+                output = output.make_contains_if_set();
+                if !relation.strict_contains || relation.early_exit {
+                    return output;
+                }
             }
         }
-        Relation::Disjoint
+
+        if contains == other.len() {
+            output = output.make_strict_contains_if_set();
+        }
+
+        if output.any_relation() {
+            output
+        } else {
+            output.make_disjoint_if_set()
+        }
     }
 }
 
 impl<'a> RelationBetweenShapes<Zine<'a>> for Zolygon<'a> {
-    fn relation(&self, other: &Zine<'a>) -> Relation {
-        match other.relation(self) {
-            Relation::Contained => Relation::Contains,
-            other => other,
-        }
+    fn relation(&self, other: &Zine<'a>, relation: InputRelation) -> OutputRelation {
+        other
+            .relation(self, relation.swap_contains_relation())
+            .swap_contains_relation()
     }
 }
 
 impl<'a> RelationBetweenShapes<ZultiLines<'a>> for Zolygon<'a> {
-    fn relation(&self, other: &ZultiLines<'a>) -> Relation {
-        match other.relation(self) {
-            Relation::Contained => Relation::Contains,
-            other => other,
-        }
+    fn relation(&self, other: &ZultiLines<'a>, relation: InputRelation) -> OutputRelation {
+        other
+            .relation(self, relation.swap_contains_relation())
+            .swap_contains_relation()
     }
 }
 
 impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zolygon<'a> {
-    fn relation(&self, other: &Zolygon<'a>) -> Relation {
-        #[allow(clippy::if_same_then_else)] // readability
-        if self.is_empty() || other.is_empty() {
-            return Relation::Disjoint;
-        } else if self.bounding_box().relation(other.bounding_box()) == Relation::Disjoint {
-            return Relation::Disjoint;
+    fn relation(&self, other: &Zolygon<'a>, relation: InputRelation) -> OutputRelation {
+        let output = relation.to_false();
+
+        if self.is_empty() || other.is_empty() || self.bounding_box().disjoint(other.bounding_box())
+        {
+            return output.make_disjoint_if_set();
         }
 
         // To know if two polygons intersect we check if any of the segments of the first polygon intersect with the second polygon.
@@ -190,7 +200,7 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zolygon<'a> {
         for segment in self.segments() {
             for other_segment in other.segments() {
                 if segment.intersects(&other_segment) {
-                    return Relation::Intersects;
+                    return output.make_intersect_if_set();
                 }
             }
         }
@@ -199,54 +209,48 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zolygon<'a> {
         // is contained in the other we check any of his points is contained in the other polygon.
         // safe to unwrap because we checked that the polygons are not empty
         let any = self.coords().iter().next().unwrap();
-        if other.relation(any) == Relation::Contains {
-            return Relation::Contained;
+        if other.contains(any) {
+            return output.make_strict_contained_if_set();
         }
         let any = other.coords().iter().next().unwrap();
-        if self.relation(any) == Relation::Contains {
-            return Relation::Contains;
+        if self.contains(any) {
+            return output.make_strict_contains_if_set();
         }
 
-        Relation::Disjoint
+        output.make_disjoint_if_set()
     }
 }
 
 impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for Zolygon<'a> {
-    fn relation(&self, other: &ZultiPolygons<'a>) -> Relation {
-        match other.relation(self) {
-            Relation::Contains => Relation::Contained,
-            Relation::Contained => Relation::Contains,
-            r => r,
-        }
+    fn relation(&self, other: &ZultiPolygons<'a>, relation: InputRelation) -> OutputRelation {
+        other
+            .relation(self, relation.swap_contains_relation())
+            .swap_contains_relation()
     }
 }
 
 impl<'a> RelationBetweenShapes<Zerometry<'a>> for Zolygon<'a> {
-    fn relation(&self, other: &Zerometry<'a>) -> Relation {
-        match other.relation(self) {
-            Relation::Contains => Relation::Contained,
-            Relation::Contained => Relation::Contains,
-            r => r,
-        }
+    fn relation(&self, other: &Zerometry<'a>, relation: InputRelation) -> OutputRelation {
+        other
+            .relation(self, relation.swap_contains_relation())
+            .swap_contains_relation()
     }
 }
 
 impl<'a> RelationBetweenShapes<Polygon<f64>> for Zolygon<'a> {
-    fn relation(&self, other: &Polygon<f64>) -> Relation {
+    fn relation(&self, other: &Polygon<f64>, relation: InputRelation) -> OutputRelation {
         let mut buffer = Vec::new();
         Zerometry::write_from_geometry(&mut buffer, &Geometry::Polygon(other.clone())).unwrap();
         let other = Zerometry::from_bytes(&buffer).unwrap();
-        self.relation(&other)
+        self.relation(&other, relation)
     }
 }
 
 impl<'a> RelationBetweenShapes<Zolygon<'a>> for Polygon<f64> {
-    fn relation(&self, other: &Zolygon<'a>) -> Relation {
-        match other.relation(self) {
-            Relation::Contains => Relation::Contained,
-            Relation::Contained => Relation::Contains,
-            r => r,
-        }
+    fn relation(&self, other: &Zolygon<'a>, relation: InputRelation) -> OutputRelation {
+        other
+            .relation(self, relation.swap_contains_relation())
+            .swap_contains_relation()
     }
 }
 
@@ -265,8 +269,9 @@ impl<'a> PartialEq<Polygon<f64>> for Zolygon<'a> {
 #[cfg(test)]
 mod tests {
     use bytemuck::cast_slice;
+    use geo::{MultiPoint, point, polygon};
     use geo_types::{LineString, Point};
-    use insta::assert_debug_snapshot;
+    use insta::{assert_compact_debug_snapshot, assert_debug_snapshot};
 
     use super::*;
 
@@ -405,8 +410,14 @@ mod tests {
         let zolygon = Zolygon::from_bytes(&buffer[..zoint_inside_bytes]);
         let point_inside = Zoint::from_bytes(&buffer[zoint_inside_bytes..zoint_outside_bytes]);
         let point_outside = Zoint::from_bytes(&buffer[zoint_outside_bytes..]);
-        assert_eq!(zolygon.relation(&point_inside), Relation::Contains);
-        assert_eq!(zolygon.relation(&point_outside), Relation::Disjoint);
+        assert_compact_debug_snapshot!(
+            zolygon.all_relation(&point_inside),
+            @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }"
+        );
+        assert_compact_debug_snapshot!(
+            zolygon.all_relation(&point_outside),
+            @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }"
+        );
     }
 
     #[test]
@@ -442,13 +453,13 @@ mod tests {
         let second = buffer.len();
         let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
         let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
-        assert_eq!(
-            first_zolygon.relation(&second_zolygon),
-            Relation::Intersects
+        assert_compact_debug_snapshot!(
+            first_zolygon.all_relation(&second_zolygon),
+            @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }"
         );
-        assert_eq!(
-            second_zolygon.relation(&first_zolygon),
-            Relation::Intersects
+        assert_compact_debug_snapshot!(
+            second_zolygon.all_relation(&first_zolygon),
+            @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }"
         );
     }
 
@@ -485,13 +496,13 @@ mod tests {
         let second = buffer.len();
         let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
         let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
-        assert_eq!(
-            first_zolygon.relation(&second_zolygon),
-            Relation::Intersects
+        assert_compact_debug_snapshot!(
+            first_zolygon.all_relation(&second_zolygon),
+            @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }"
         );
-        assert_eq!(
-            second_zolygon.relation(&first_zolygon),
-            Relation::Intersects
+        assert_compact_debug_snapshot!(
+            second_zolygon.all_relation(&first_zolygon),
+            @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }"
         );
     }
 
@@ -528,13 +539,13 @@ mod tests {
         let second = buffer.len();
         let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
         let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
-        assert_eq!(
-            first_zolygon.relation(&second_zolygon),
-            Relation::Intersects
+        assert_compact_debug_snapshot!(
+            first_zolygon.all_relation(&second_zolygon),
+            @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }"
         );
-        assert_eq!(
-            second_zolygon.relation(&first_zolygon),
-            Relation::Intersects
+        assert_compact_debug_snapshot!(
+            second_zolygon.all_relation(&first_zolygon),
+            @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }"
         );
     }
 
@@ -571,8 +582,14 @@ mod tests {
         let second = buffer.len();
         let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
         let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
-        assert_eq!(first_zolygon.relation(&second_zolygon), Relation::Contains);
-        assert_eq!(second_zolygon.relation(&first_zolygon), Relation::Contained);
+        assert_compact_debug_snapshot!(
+            first_zolygon.all_relation(&second_zolygon),
+            @"OutputRelation { contains: Some(true), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }"
+        );
+        assert_compact_debug_snapshot!(
+            second_zolygon.all_relation(&first_zolygon),
+            @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }"
+        );
     }
 
     // In this test the bounding boxes are disjoint and we can early exit.
@@ -609,8 +626,14 @@ mod tests {
         let second = buffer.len();
         let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
         let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
-        assert_eq!(first_zolygon.relation(&second_zolygon), Relation::Disjoint);
-        assert_eq!(second_zolygon.relation(&first_zolygon), Relation::Disjoint);
+        assert_compact_debug_snapshot!(
+            first_zolygon.all_relation(&second_zolygon),
+            @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }"
+        );
+        assert_compact_debug_snapshot!(
+            second_zolygon.all_relation(&first_zolygon),
+            @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }"
+        );
     }
 
     #[test]
@@ -644,8 +667,82 @@ mod tests {
         let second = buffer.len();
         let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
         let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
-        assert_eq!(first_zolygon.relation(&second_zolygon), Relation::Disjoint);
-        assert_eq!(second_zolygon.relation(&first_zolygon), Relation::Disjoint);
+        assert_compact_debug_snapshot!(
+            first_zolygon.all_relation(&second_zolygon),
+            @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }"
+        );
+        assert_compact_debug_snapshot!(
+            second_zolygon.all_relation(&first_zolygon),
+            @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }"
+        );
+    }
+
+    #[test]
+    fn test_multi_points_and_polygon() {
+        let polygon = polygon![
+             (x: 0., y: 0.),
+             (x: 1., y: 0.),
+             (x: 1., y: 1.),
+             (x: 0., y: 1.),
+        ];
+
+        let mut buf = Vec::new();
+        Zolygon::write_from_geometry(&mut buf, &polygon).unwrap();
+        let zolygon = Zolygon::from_bytes(&buf);
+
+        let inside = point! { x: 0.5, y: 0.5};
+        let inside2 = point! { x: 0.6, y: 0.6};
+        let outside = point! { x: 1.5, y: 1.5};
+        let outside2 = point! { x: 1.6, y: 1.6};
+
+        let mp_strict_inside = MultiPoint::new(vec![inside]);
+        let mp_strict_inside_2 = MultiPoint::new(vec![inside, inside2]);
+        let mp_strict_outside = MultiPoint::new(vec![outside]);
+        let mp_strict_outside_2 = MultiPoint::new(vec![outside, outside2]);
+        let mp_inside = MultiPoint::new(vec![inside, outside]);
+        let mp_inside2 = MultiPoint::new(vec![inside, inside2, outside]);
+        let mp_inside4 = MultiPoint::new(vec![inside, outside, outside2]);
+        let mp_inside3 = MultiPoint::new(vec![inside, inside2, outside, outside2]);
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_strict_inside).unwrap();
+        let mp_strict_inside = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_strict_inside.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_strict_inside_2).unwrap();
+        let mp_strict_inside_2 = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_strict_inside_2.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_strict_outside).unwrap();
+        let mp_strict_outside = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_strict_outside.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_strict_outside_2).unwrap();
+        let mp_strict_outside_2 = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_strict_outside_2.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_inside).unwrap();
+        let mp_inside = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_inside.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_inside2).unwrap();
+        let mp_inside2 = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_inside2.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_inside4).unwrap();
+        let mp_inside4 = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_inside4.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        ZultiPoints::write_from_geometry(&mut buf, &mp_inside3).unwrap();
+        let mp_inside3 = ZultiPoints::from_bytes(&buf);
+        assert_compact_debug_snapshot!(mp_inside3.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
     }
 
     // Prop test ensuring we can round trip from a polygon to a zolygon and back to a polygon
