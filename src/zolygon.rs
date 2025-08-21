@@ -1,6 +1,7 @@
 use core::fmt;
 use std::io::{self, Write};
 
+use geo::MultiPolygon;
 use geo_types::{Geometry, Polygon};
 
 use crate::{
@@ -242,6 +243,15 @@ impl<'a> RelationBetweenShapes<Polygon<f64>> for Zolygon<'a> {
         let mut buffer = Vec::new();
         Zerometry::write_from_geometry(&mut buffer, &Geometry::Polygon(other.clone())).unwrap();
         let other = Zerometry::from_bytes(&buffer).unwrap();
+        self.relation(&other, relation)
+    }
+}
+
+impl<'a> RelationBetweenShapes<MultiPolygon<f64>> for Zolygon<'a> {
+    fn relation(&self, other: &MultiPolygon<f64>, relation: InputRelation) -> OutputRelation {
+        let mut buffer = Vec::new();
+        ZultiPolygons::write_from_geometry(&mut buffer, other).unwrap();
+        let other = ZultiPolygons::from_bytes(&buffer);
         self.relation(&other, relation)
     }
 }
