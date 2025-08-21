@@ -54,6 +54,7 @@ impl<'a> Zerometry<'a> {
             // They're located after because it would be a db-breaking to edit the already existing tags
             4 => Ok(Zerometry::Line(Zine::from_bytes(data))),
             5 => Ok(Zerometry::MultiLines(ZultiLines::from_bytes(data))),
+            6 => Ok(Zerometry::Collection(Zollection::from_bytes(data))),
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Invalid zerometry tag",
@@ -92,7 +93,10 @@ impl<'a> Zerometry<'a> {
                 writer.extend_from_slice(&5_u64.to_ne_bytes());
                 ZultiLines::write_from_geometry(writer, multi_line_string)?;
             }
-            Geometry::GeometryCollection(_geometry_collection) => todo!(),
+            Geometry::GeometryCollection(collection) => {
+                writer.extend_from_slice(&6_u64.to_ne_bytes());
+                Zollection::write_from_geometry(writer, collection)?;
+            }
             // Should never happens since we're working with geogson in meilisearch
             Geometry::Line(line) => {
                 let line = LineString::new(vec![line.start, line.end]);
