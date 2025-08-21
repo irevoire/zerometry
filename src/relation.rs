@@ -67,6 +67,10 @@ impl InputRelation {
         OutputRelation::false_from_input(self)
     }
 
+    pub fn to_true(self) -> OutputRelation {
+        OutputRelation::true_from_input(self)
+    }
+
     pub fn strip_strict(mut self) -> Self {
         self.strict_contains = false;
         self.strict_contained = false;
@@ -112,6 +116,17 @@ impl OutputRelation {
         }
     }
 
+    pub fn true_from_input(relation: InputRelation) -> Self {
+        Self {
+            contains: relation.contains.then_some(true),
+            strict_contains: relation.strict_contains.then_some(true),
+            contained: relation.contained.then_some(true),
+            strict_contained: relation.strict_contained.then_some(true),
+            intersect: relation.intersect.then_some(true),
+            disjoint: relation.disjoint.then_some(true),
+        }
+    }
+
     pub fn make_contains_if_set(mut self) -> Self {
         self.contains = self.contains.map(|_| true);
         self
@@ -141,6 +156,12 @@ impl OutputRelation {
 
     pub fn make_disjoint_if_set(mut self) -> Self {
         self.disjoint = self.disjoint.map(|_| true);
+        self
+    }
+
+    pub fn strip_strict(mut self) -> Self {
+        self.strict_contains = None;
+        self.strict_contained = None;
         self
     }
 
@@ -197,47 +218,6 @@ impl OutputRelation {
                 || self.contained.unwrap_or_default()
                 || self.strict_contained.unwrap_or_default()
                 || self.intersect.unwrap_or_default())
-    }
-
-    fn strip_unrequested_fields(self, relation: InputRelation) -> Self {
-        let Self {
-            mut contains,
-            mut strict_contains,
-            mut contained,
-            mut strict_contained,
-            mut intersect,
-            mut disjoint,
-        } = self;
-
-        if !relation.contains {
-            contains = None;
-        }
-
-        if !relation.strict_contains {
-            strict_contains = None;
-        }
-
-        if !relation.contained {
-            contained = None;
-        }
-        if !relation.strict_contained {
-            strict_contained = None;
-        }
-        if !relation.intersect {
-            intersect = None;
-        }
-        if !relation.disjoint {
-            disjoint = None;
-        }
-
-        Self {
-            contains,
-            strict_contains,
-            contained,
-            strict_contained,
-            intersect,
-            disjoint,
-        }
     }
 
     pub fn swap_contains_relation(mut self) -> Self {

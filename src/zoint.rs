@@ -4,8 +4,8 @@ use std::io::{self, Write};
 use geo_types::Point;
 
 use crate::{
-    Coord, InputRelation, OutputRelation, RelationBetweenShapes, Zerometry, Zolygon, ZultiPoints,
-    ZultiPolygons, zine::Zine, zulti_lines::ZultiLines,
+    Coord, InputRelation, OutputRelation, RelationBetweenShapes, Zerometry, Zollection, Zolygon,
+    ZultiPoints, ZultiPolygons, zine::Zine, zulti_lines::ZultiLines,
 };
 
 #[derive(Clone, Copy)]
@@ -110,6 +110,14 @@ impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zoint<'a> {
 
 impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for Zoint<'a> {
     fn relation(&self, other: &ZultiPolygons<'a>, relation: InputRelation) -> OutputRelation {
+        other
+            .relation(self, relation.swap_contains_relation())
+            .swap_contains_relation()
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zollection<'a>> for Zoint<'a> {
+    fn relation(&self, other: &Zollection<'a>, relation: InputRelation) -> OutputRelation {
         other
             .relation(self, relation.swap_contains_relation())
             .swap_contains_relation()

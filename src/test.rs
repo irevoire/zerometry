@@ -1,6 +1,6 @@
 use insta::assert_compact_debug_snapshot;
 
-use crate::{Coord, InputRelation, OutputRelation, RelationBetweenShapes, Zerometry, Zoint};
+use crate::{Coord, RelationBetweenShapes, Zerometry, Zoint};
 
 #[test]
 fn test_mono_multipolygon_contains_points() {

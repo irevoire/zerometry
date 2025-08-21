@@ -3,7 +3,8 @@ use std::{io, mem};
 use geo::{GeometryCollection, MultiLineString, MultiPoint, MultiPolygon, Point};
 
 use crate::{
-    BoundingBox, ZultiLines, ZultiPoints, ZultiPolygons, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES,
+    BoundingBox, InputRelation, OutputRelation, RelationBetweenShapes, Zerometry, Zine, Zoint,
+    Zolygon, ZultiLines, ZultiPoints, ZultiPolygons, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES,
 };
 
 /// This type is used to merge both the feature collection and the geometry collection.
@@ -199,6 +200,191 @@ fn flatten_geometry_collection(
     }
 
     (points, lines, polygons)
+}
+
+impl<'a> RelationBetweenShapes<Zoint<'a>> for Zollection<'a> {
+    fn relation(&self, other: &Zoint<'a>, relation: InputRelation) -> OutputRelation {
+        if self.is_empty() || self.bounding_box().contains_coord(other.coord()) {
+            return relation.to_false().make_disjoint_if_set();
+        }
+
+        // points and lines can't have any relation with point
+        self.polygons().relation(other, relation)
+    }
+}
+
+impl<'a> RelationBetweenShapes<ZultiPoints<'a>> for Zollection<'a> {
+    fn relation(&self, other: &ZultiPoints<'a>, relation: InputRelation) -> OutputRelation {
+        if self.is_empty() || self.bounding_box().disjoint(other.bounding_box()) {
+            return relation.to_false().make_disjoint_if_set();
+        }
+
+        // points and lines can't have any relation with point
+        self.polygons().relation(other, relation)
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zine<'a>> for Zollection<'a> {
+    fn relation(&self, other: &Zine<'a>, relation: InputRelation) -> OutputRelation {
+        let mut output = relation.to_false();
+
+        if self.is_empty() || self.bounding_box().disjoint(other.bounding_box()) {
+            return output.make_disjoint_if_set();
+        }
+
+        output |= self.lines().relation(other, relation.strip_disjoint());
+        output |= self.polygons().relation(other, relation.strip_disjoint());
+
+        if output.any_relation() {
+            output
+        } else {
+            output.make_disjoint_if_set()
+        }
+    }
+}
+
+impl<'a> RelationBetweenShapes<ZultiLines<'a>> for Zollection<'a> {
+    fn relation(&self, other: &ZultiLines<'a>, relation: InputRelation) -> OutputRelation {
+        let mut output = relation.to_false();
+
+        if self.is_empty() || self.bounding_box().disjoint(other.bounding_box()) {
+            return output.make_disjoint_if_set();
+        }
+
+        output |= self.lines().relation(other, relation.strip_disjoint());
+        output |= self.polygons().relation(other, relation.strip_disjoint());
+
+        if output.any_relation() {
+            output
+        } else {
+            output.make_disjoint_if_set()
+        }
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zolygon<'a>> for Zollection<'a> {
+    fn relation(&self, other: &Zolygon<'a>, relation: InputRelation) -> OutputRelation {
+        let mut output = relation.to_false();
+
+        if self.is_empty() || self.bounding_box().disjoint(other.bounding_box()) {
+            return output.make_disjoint_if_set();
+        }
+
+        let points = self.points().relation(other, relation.strip_disjoint());
+        let lines = self.lines().relation(other, relation.strip_disjoint());
+        let polygons = self.polygons().relation(other, relation.strip_disjoint());
+
+        output |= points.strip_strict();
+        output |= lines.strip_strict();
+        output |= polygons.strip_strict();
+
+        if (self.points().is_empty() || points.strict_contains.unwrap_or_default())
+            && (self.lines().is_empty() || lines.strict_contains.unwrap_or_default())
+            && (self.polygons().is_empty() || polygons.strict_contains.unwrap_or_default())
+        {
+            output = output.make_strict_contains_if_set();
+        }
+        if (self.points().is_empty() || points.strict_contained.unwrap_or_default())
+            && (self.lines().is_empty() || lines.strict_contained.unwrap_or_default())
+            && (self.polygons().is_empty() || polygons.strict_contained.unwrap_or_default())
+        {
+            output = output.make_strict_contained_if_set();
+        }
+
+        if output.any_relation() {
+            output
+        } else {
+            output.make_disjoint_if_set()
+        }
+    }
+}
+
+impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for Zollection<'a> {
+    fn relation(&self, other: &ZultiPolygons<'a>, relation: InputRelation) -> OutputRelation {
+        let mut output = relation.to_false();
+
+        if self.is_empty() || self.bounding_box().disjoint(other.bounding_box()) {
+            return output.make_disjoint_if_set();
+        }
+
+        let points = self.points().relation(other, relation.strip_disjoint());
+        let lines = self.lines().relation(other, relation.strip_disjoint());
+        let polygons = self.polygons().relation(other, relation.strip_disjoint());
+
+        output |= points.strip_strict();
+        output |= lines.strip_strict();
+        output |= polygons.strip_strict();
+
+        if (self.points().is_empty() || points.strict_contains.unwrap_or_default())
+            && (self.lines().is_empty() || lines.strict_contains.unwrap_or_default())
+            && (self.polygons().is_empty() || polygons.strict_contains.unwrap_or_default())
+        {
+            output = output.make_strict_contains_if_set();
+        }
+        if (self.points().is_empty() || points.strict_contained.unwrap_or_default())
+            && (self.lines().is_empty() || lines.strict_contained.unwrap_or_default())
+            && (self.polygons().is_empty() || polygons.strict_contained.unwrap_or_default())
+        {
+            output = output.make_strict_contained_if_set();
+        }
+
+        if output.any_relation() {
+            output
+        } else {
+            output.make_disjoint_if_set()
+        }
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zollection<'a>> for Zollection<'a> {
+    fn relation(&self, other: &Zollection<'a>, relation: InputRelation) -> OutputRelation {
+        let mut output = relation.to_false();
+
+        if self.is_empty() || self.bounding_box().disjoint(other.bounding_box()) {
+            return output.make_disjoint_if_set();
+        }
+
+        let points = self.points().relation(other, relation.strip_disjoint());
+        let lines = self.lines().relation(other, relation.strip_disjoint());
+        let polygons = self.polygons().relation(other, relation.strip_disjoint());
+
+        output |= points.strip_strict();
+        output |= lines.strip_strict();
+        output |= polygons.strip_strict();
+
+        if (self.points().is_empty() || points.strict_contains.unwrap_or_default())
+            && (self.lines().is_empty() || lines.strict_contains.unwrap_or_default())
+            && (self.polygons().is_empty() || polygons.strict_contains.unwrap_or_default())
+        {
+            output = output.make_strict_contains_if_set();
+        }
+        if (self.points().is_empty() || points.strict_contained.unwrap_or_default())
+            && (self.lines().is_empty() || lines.strict_contained.unwrap_or_default())
+            && (self.polygons().is_empty() || polygons.strict_contained.unwrap_or_default())
+        {
+            output = output.make_strict_contained_if_set();
+        }
+
+        if output.any_relation() {
+            output
+        } else {
+            output.make_disjoint_if_set()
+        }
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zerometry<'a>> for Zollection<'a> {
+    fn relation(&self, other: &Zerometry<'a>, relation: InputRelation) -> OutputRelation {
+        match other {
+            Zerometry::Point(zoint) => self.relation(zoint, relation),
+            Zerometry::MultiPoints(zulti_points) => self.relation(zulti_points, relation),
+            Zerometry::Line(zine) => self.relation(zine, relation),
+            Zerometry::MultiLines(zulti_lines) => self.relation(zulti_lines, relation),
+            Zerometry::Polygon(zolygon) => self.relation(zolygon, relation),
+            Zerometry::MultiPolygon(zulti_polygons) => self.relation(zulti_polygons, relation),
+            Zerometry::Collection(zollection) => self.relation(zollection, relation),
+        }
+    }
 }
 
 #[cfg(test)]

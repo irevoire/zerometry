@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use geo::{LineString, Polygon};
 use insta::assert_compact_debug_snapshot;
-use zerometry::{OutputRelation, RelationBetweenShapes, Zerometry, Zolygon};
+use zerometry::{RelationBetweenShapes, Zerometry, Zolygon};
 
 const BREAU_ET_SALAGOSSE: &str = include_str!("assets/breau-et-salagosse.geojson");
 

@@ -4,8 +4,9 @@ use bytemuck::cast_slice;
 use geo_types::{MultiLineString, Point};
 
 use crate::{
-    BoundingBox, InputRelation, OutputRelation, RelationBetweenShapes, Zerometry, Zoint, Zolygon,
-    ZultiPoints, ZultiPolygons, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES, zine::Zine,
+    BoundingBox, InputRelation, OutputRelation, RelationBetweenShapes, Zerometry, Zoint,
+    Zollection, Zolygon, ZultiPoints, ZultiPolygons, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES,
+    zine::Zine,
 };
 
 #[derive(Clone, Copy)]
@@ -261,6 +262,14 @@ impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for ZultiLines<'a> {
         } else {
             output.make_disjoint_if_set()
         }
+    }
+}
+
+impl<'a> RelationBetweenShapes<Zollection<'a>> for ZultiLines<'a> {
+    fn relation(&self, other: &Zollection<'a>, relation: InputRelation) -> OutputRelation {
+        other
+            .relation(self, relation.swap_contains_relation())
+            .swap_contains_relation()
     }
 }
 

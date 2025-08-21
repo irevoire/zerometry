@@ -5,7 +5,8 @@ use geo::{LineString, Point};
 
 use crate::{
     BoundingBox, COORD_SIZE_IN_BYTES, Coords, InputRelation, OutputRelation, RelationBetweenShapes,
-    Segment, Zerometry, Zoint, Zolygon, ZultiPoints, ZultiPolygons, zulti_lines::ZultiLines,
+    Segment, Zerometry, Zoint, Zollection, Zolygon, ZultiPoints, ZultiPolygons,
+    zulti_lines::ZultiLines,
 };
 
 #[derive(Clone, Copy)]
@@ -182,6 +183,14 @@ impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for Zine<'a> {
     }
 }
 
+impl<'a> RelationBetweenShapes<Zollection<'a>> for Zine<'a> {
+    fn relation(&self, other: &Zollection<'a>, relation: InputRelation) -> OutputRelation {
+        other
+            .relation(self, relation.swap_contains_relation())
+            .swap_contains_relation()
+    }
+}
+
 impl<'a> RelationBetweenShapes<Zerometry<'a>> for Zine<'a> {
     fn relation(&self, other: &Zerometry<'a>, relation: InputRelation) -> OutputRelation {
         match other {
@@ -191,7 +200,7 @@ impl<'a> RelationBetweenShapes<Zerometry<'a>> for Zine<'a> {
             Zerometry::MultiLines(zulti_lines) => self.relation(zulti_lines, relation),
             Zerometry::Polygon(zolygon) => self.relation(zolygon, relation),
             Zerometry::MultiPolygon(zulti_polygon) => self.relation(zulti_polygon, relation),
-            Zerometry::Collection(zollection) => todo!(),
+            Zerometry::Collection(zollection) => self.relation(zollection, relation),
         }
     }
 }
