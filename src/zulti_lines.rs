@@ -241,7 +241,6 @@ impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for ZultiLines<'a> {
         for line in self.lines() {
             for polygon in other.polygons() {
                 let r = line.relation(&polygon, relation.strip_strict().strip_disjoint());
-                dbg!(r);
                 output |= r;
                 if r.contained.unwrap_or_default() {
                     contained += 1;

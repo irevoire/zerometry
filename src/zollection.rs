@@ -315,10 +315,7 @@ impl<'a> RelationBetweenShapes<ZultiPolygons<'a>> for Zollection<'a> {
         output |= lines.strip_strict();
         output |= polygons.strip_strict();
 
-        if (self.points().is_empty() || points.strict_contains.unwrap_or_default())
-            && (self.lines().is_empty() || lines.strict_contains.unwrap_or_default())
-            && (self.polygons().is_empty() || polygons.strict_contains.unwrap_or_default())
-        {
+        if !self.polygons().is_empty() && polygons.strict_contains.unwrap_or_default() {
             output = output.make_strict_contains_if_set();
         }
         if (self.points().is_empty() || points.strict_contained.unwrap_or_default())
@@ -352,10 +349,7 @@ impl<'a> RelationBetweenShapes<Zollection<'a>> for Zollection<'a> {
         output |= lines.strip_strict();
         output |= polygons.strip_strict();
 
-        if (self.points().is_empty() || points.strict_contains.unwrap_or_default())
-            && (self.lines().is_empty() || lines.strict_contains.unwrap_or_default())
-            && (self.polygons().is_empty() || polygons.strict_contains.unwrap_or_default())
-        {
+        if !self.polygons().is_empty() && polygons.strict_contains.unwrap_or_default() {
             output = output.make_strict_contains_if_set();
         }
         if (self.points().is_empty() || points.strict_contained.unwrap_or_default())
@@ -390,7 +384,7 @@ impl<'a> RelationBetweenShapes<Zerometry<'a>> for Zollection<'a> {
 #[cfg(test)]
 mod tests {
     use bytemuck::cast_slice;
-    use geo::{LineString, Polygon};
+    use geo::{Geometry, LineString, Polygon, line_string, polygon};
     use geo_types::MultiLineString;
     use insta::{assert_compact_debug_snapshot, assert_debug_snapshot, assert_snapshot};
 
@@ -861,5 +855,97 @@ mod tests {
         }
         ");
         assert!(!zollection.is_empty());
+    }
+
+    #[test]
+    fn test_zollection() {
+        let point = Point::new(0.5, 0.5);
+        let line = line_string![
+             (x: 0.1, y: 0.1),
+             (x: 0.9, y: 0.9),
+        ];
+        let polygon = polygon![
+             (x: 0., y: 0.),
+             (x: 1., y: 0.),
+             (x: 1., y: 1.),
+             (x: 0., y: 1.),
+        ];
+
+        let mut buf = Vec::new();
+        Zollection::write_from_geometry(
+            &mut buf,
+            &GeometryCollection(vec![
+                Geometry::from(point),
+                Geometry::from(line.clone()),
+                Geometry::from(polygon.clone()),
+            ]),
+        )
+        .unwrap();
+        let zolygon = Zollection::from_bytes(&buf);
+        assert_compact_debug_snapshot!(zolygon.all_relation(&zolygon), @"OutputRelation { contains: Some(true), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        Zollection::write_from_geometry(
+            &mut buf,
+            &GeometryCollection(vec![Geometry::from(point), Geometry::from(line.clone())]),
+        )
+        .unwrap();
+        let other = Zollection::from_bytes(&buf);
+        assert_compact_debug_snapshot!(zolygon.all_relation(&other), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
+        assert_compact_debug_snapshot!(other.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(true), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        Zollection::write_from_geometry(
+            &mut buf,
+            &GeometryCollection(vec![
+                // Add a point that is out of the polygon. We should now be contained but not strictly
+                Geometry::from(MultiPoint::new(vec![point, Point::new(5.0, 5.0)])),
+                Geometry::from(line.clone()),
+            ]),
+        )
+        .unwrap();
+        let other = Zollection::from_bytes(&buf);
+        assert_compact_debug_snapshot!(zolygon.all_relation(&other), @"OutputRelation { contains: Some(true), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        Zollection::write_from_geometry(
+            &mut buf,
+            &GeometryCollection(vec![
+                // Same but with two high level geometry instead of one multi point
+                Geometry::from(point),
+                Geometry::from(line.clone()),
+                Geometry::from(Point::new(5.0, 5.0)),
+            ]),
+        )
+        .unwrap();
+        let other = Zollection::from_bytes(&buf);
+        assert_compact_debug_snapshot!(zolygon.all_relation(&other), @"OutputRelation { contains: Some(true), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        Zollection::write_from_geometry(
+            &mut buf,
+            &GeometryCollection(vec![
+                // Same but with a polygon contained instead of an intersecting line
+                Geometry::from(point),
+                Geometry::from(polygon![(x: 0.05, y: 0.05), (x: 0.95, y: 0.05), (x: 0.95, y: 0.95), (x: 0.05, y: 0.95)]),
+                Geometry::from(Point::new(5.0, 5.0)),
+            ]),
+        )
+        .unwrap();
+        let other = Zollection::from_bytes(&buf);
+        assert_compact_debug_snapshot!(zolygon.all_relation(&other), @"OutputRelation { contains: Some(true), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
+
+        let mut buf = Vec::new();
+        Zollection::write_from_geometry(
+            &mut buf,
+            &GeometryCollection(vec![
+                // Same without the unrelated poins
+                Geometry::from(point),
+                Geometry::from(polygon![(x: 0.05, y: 0.05), (x: 0.95, y: 0.05), (x: 0.95, y: 0.95), (x: 0.05, y: 0.95)]),
+            ]),
+        )
+        .unwrap();
+        let other = Zollection::from_bytes(&buf);
+        assert_compact_debug_snapshot!(zolygon.all_relation(&other), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
     }
 }
