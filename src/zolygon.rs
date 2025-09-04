@@ -32,7 +32,9 @@ impl<'a> Zolygon<'a> {
         }
     }
 
-    pub fn from_bytes(data: &'a [u8]) -> Self {
+    /// # Safety
+    /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
+    pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
         debug_assert!(
             data.len() % COORD_SIZE_IN_FLOATS == 0,
             "Data length must be a multiple of {COORD_SIZE_IN_FLOATS}"
@@ -45,8 +47,8 @@ impl<'a> Zolygon<'a> {
             data.as_ptr() as usize % COORD_SIZE_IN_FLOATS == 0,
             "Data must be aligned to {COORD_SIZE_IN_FLOATS}"
         );
-        let bounding_box = BoundingBox::from_bytes(&data[0..COORD_SIZE_IN_BYTES * 2]);
-        let coords = Coords::from_bytes(&data[COORD_SIZE_IN_BYTES * 2..]);
+        let bounding_box = unsafe { BoundingBox::from_bytes(&data[0..COORD_SIZE_IN_BYTES * 2]) };
+        let coords = unsafe { Coords::from_bytes(&data[COORD_SIZE_IN_BYTES * 2..]) };
         Self::new(bounding_box, coords)
     }
 
@@ -251,7 +253,7 @@ impl<'a> RelationBetweenShapes<Polygon<f64>> for Zolygon<'a> {
     fn relation(&self, other: &Polygon<f64>, relation: InputRelation) -> OutputRelation {
         let mut buffer = Vec::new();
         Zerometry::write_from_geometry(&mut buffer, &Geometry::Polygon(other.clone())).unwrap();
-        let other = Zerometry::from_bytes(&buffer).unwrap();
+        let other = unsafe { Zerometry::from_bytes(&buffer).unwrap() };
         self.relation(&other, relation)
     }
 }
@@ -260,7 +262,7 @@ impl<'a> RelationBetweenShapes<MultiPolygon<f64>> for Zolygon<'a> {
     fn relation(&self, other: &MultiPolygon<f64>, relation: InputRelation) -> OutputRelation {
         let mut buffer = Vec::new();
         ZultiPolygons::write_from_geometry(&mut buffer, other).unwrap();
-        let other = ZultiPolygons::from_bytes(&buffer);
+        let other = unsafe { ZultiPolygons::from_bytes(&buffer) };
         self.relation(&other, relation)
     }
 }
@@ -332,7 +334,7 @@ mod tests {
             0.0,
         ]
         ");
-        let zolygon = Zolygon::from_bytes(&buffer);
+        let zolygon = unsafe { Zolygon::from_bytes(&buffer) };
         insta::assert_debug_snapshot!(zolygon.bounding_box(), @r"
         BoundingBox {
             bottom_left: Coord {
@@ -388,7 +390,7 @@ mod tests {
             0.0,
         ]
         ");
-        let zolygon = Zolygon::from_bytes(&buffer);
+        let zolygon = unsafe { Zolygon::from_bytes(&buffer) };
         insta::assert_debug_snapshot!(zolygon.bounding_box(), @r"
         BoundingBox {
             bottom_left: Coord {
@@ -426,9 +428,10 @@ mod tests {
         let zoint_outside_bytes = buffer.len();
         Zoint::write_from_geometry(&mut buffer, &Point::new(15.0, 15.0)).unwrap();
 
-        let zolygon = Zolygon::from_bytes(&buffer[..zoint_inside_bytes]);
-        let point_inside = Zoint::from_bytes(&buffer[zoint_inside_bytes..zoint_outside_bytes]);
-        let point_outside = Zoint::from_bytes(&buffer[zoint_outside_bytes..]);
+        let zolygon = unsafe { Zolygon::from_bytes(&buffer[..zoint_inside_bytes]) };
+        let point_inside =
+            unsafe { Zoint::from_bytes(&buffer[zoint_inside_bytes..zoint_outside_bytes]) };
+        let point_outside = unsafe { Zoint::from_bytes(&buffer[zoint_outside_bytes..]) };
         assert_compact_debug_snapshot!(
             zolygon.all_relation(&point_inside),
             @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }"
@@ -470,8 +473,8 @@ mod tests {
         )
         .unwrap();
         let second = buffer.len();
-        let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
-        let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
+        let first_zolygon = unsafe { Zolygon::from_bytes(&buffer[..first]) };
+        let second_zolygon = unsafe { Zolygon::from_bytes(&buffer[first..second]) };
         assert_compact_debug_snapshot!(
             first_zolygon.all_relation(&second_zolygon),
             @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }"
@@ -513,8 +516,8 @@ mod tests {
         )
         .unwrap();
         let second = buffer.len();
-        let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
-        let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
+        let first_zolygon = unsafe { Zolygon::from_bytes(&buffer[..first]) };
+        let second_zolygon = unsafe { Zolygon::from_bytes(&buffer[first..second]) };
         assert_compact_debug_snapshot!(
             first_zolygon.all_relation(&second_zolygon),
             @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }"
@@ -556,8 +559,8 @@ mod tests {
         )
         .unwrap();
         let second = buffer.len();
-        let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
-        let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
+        let first_zolygon = unsafe { Zolygon::from_bytes(&buffer[..first]) };
+        let second_zolygon = unsafe { Zolygon::from_bytes(&buffer[first..second]) };
         assert_compact_debug_snapshot!(
             first_zolygon.all_relation(&second_zolygon),
             @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }"
@@ -599,8 +602,8 @@ mod tests {
         )
         .unwrap();
         let second = buffer.len();
-        let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
-        let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
+        let first_zolygon = unsafe { Zolygon::from_bytes(&buffer[..first]) };
+        let second_zolygon = unsafe { Zolygon::from_bytes(&buffer[first..second]) };
         assert_compact_debug_snapshot!(
             first_zolygon.all_relation(&second_zolygon),
             @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }"
@@ -643,8 +646,8 @@ mod tests {
         )
         .unwrap();
         let second = buffer.len();
-        let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
-        let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
+        let first_zolygon = unsafe { Zolygon::from_bytes(&buffer[..first]) };
+        let second_zolygon = unsafe { Zolygon::from_bytes(&buffer[first..second]) };
         assert_compact_debug_snapshot!(
             first_zolygon.all_relation(&second_zolygon),
             @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }"
@@ -684,8 +687,8 @@ mod tests {
         )
         .unwrap();
         let second = buffer.len();
-        let first_zolygon = Zolygon::from_bytes(&buffer[..first]);
-        let second_zolygon = Zolygon::from_bytes(&buffer[first..second]);
+        let first_zolygon = unsafe { Zolygon::from_bytes(&buffer[..first]) };
+        let second_zolygon = unsafe { Zolygon::from_bytes(&buffer[first..second]) };
         assert_compact_debug_snapshot!(
             first_zolygon.all_relation(&second_zolygon),
             @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }"
@@ -707,7 +710,7 @@ mod tests {
 
         let mut buf = Vec::new();
         Zolygon::write_from_geometry(&mut buf, &polygon).unwrap();
-        let zolygon = Zolygon::from_bytes(&buf);
+        let zolygon = unsafe { Zolygon::from_bytes(&buf) };
 
         let inside = point! { x: 0.5, y: 0.5};
         let inside2 = point! { x: 0.6, y: 0.6};
@@ -725,42 +728,42 @@ mod tests {
 
         let mut buf = Vec::new();
         ZultiPoints::write_from_geometry(&mut buf, &mp_strict_inside).unwrap();
-        let mp_strict_inside = ZultiPoints::from_bytes(&buf);
+        let mp_strict_inside = unsafe { ZultiPoints::from_bytes(&buf) };
         assert_compact_debug_snapshot!(mp_strict_inside.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
 
         let mut buf = Vec::new();
         ZultiPoints::write_from_geometry(&mut buf, &mp_strict_inside_2).unwrap();
-        let mp_strict_inside_2 = ZultiPoints::from_bytes(&buf);
+        let mp_strict_inside_2 = unsafe { ZultiPoints::from_bytes(&buf) };
         assert_compact_debug_snapshot!(mp_strict_inside_2.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
 
         let mut buf = Vec::new();
         ZultiPoints::write_from_geometry(&mut buf, &mp_strict_outside).unwrap();
-        let mp_strict_outside = ZultiPoints::from_bytes(&buf);
+        let mp_strict_outside = unsafe { ZultiPoints::from_bytes(&buf) };
         assert_compact_debug_snapshot!(mp_strict_outside.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
 
         let mut buf = Vec::new();
         ZultiPoints::write_from_geometry(&mut buf, &mp_strict_outside_2).unwrap();
-        let mp_strict_outside_2 = ZultiPoints::from_bytes(&buf);
+        let mp_strict_outside_2 = unsafe { ZultiPoints::from_bytes(&buf) };
         assert_compact_debug_snapshot!(mp_strict_outside_2.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
 
         let mut buf = Vec::new();
         ZultiPoints::write_from_geometry(&mut buf, &mp_inside).unwrap();
-        let mp_inside = ZultiPoints::from_bytes(&buf);
+        let mp_inside = unsafe { ZultiPoints::from_bytes(&buf) };
         assert_compact_debug_snapshot!(mp_inside.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
 
         let mut buf = Vec::new();
         ZultiPoints::write_from_geometry(&mut buf, &mp_inside2).unwrap();
-        let mp_inside2 = ZultiPoints::from_bytes(&buf);
+        let mp_inside2 = unsafe { ZultiPoints::from_bytes(&buf) };
         assert_compact_debug_snapshot!(mp_inside2.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
 
         let mut buf = Vec::new();
         ZultiPoints::write_from_geometry(&mut buf, &mp_inside4).unwrap();
-        let mp_inside4 = ZultiPoints::from_bytes(&buf);
+        let mp_inside4 = unsafe { ZultiPoints::from_bytes(&buf) };
         assert_compact_debug_snapshot!(mp_inside4.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
 
         let mut buf = Vec::new();
         ZultiPoints::write_from_geometry(&mut buf, &mp_inside3).unwrap();
-        let mp_inside3 = ZultiPoints::from_bytes(&buf);
+        let mp_inside3 = unsafe { ZultiPoints::from_bytes(&buf) };
         assert_compact_debug_snapshot!(mp_inside3.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
     }
 
@@ -771,7 +774,7 @@ mod tests {
             let polygon = Polygon::new(LineString::new(points.iter().map(|(x, y)| geo_types::Coord { x: *x, y: *y }).collect()), Vec::new());
             let mut buffer = Vec::new();
             Zolygon::write_from_geometry(&mut buffer, &polygon).unwrap();
-            let zolygon = Zolygon::from_bytes(&buffer);
+            let zolygon = unsafe { Zolygon::from_bytes(&buffer) };
             assert_eq!(zolygon, polygon);
         }
     }

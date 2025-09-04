@@ -29,9 +29,11 @@ impl<'a> ZultiPolygons<'a> {
         }
     }
 
-    pub fn from_bytes(data: &'a [u8]) -> Self {
+    /// # Safety
+    /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
+    pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
         // 1. Retrieve the bounding box
-        let bounding_box = BoundingBox::from_bytes(&data[..BOUNDING_BOX_SIZE_IN_BYTES]);
+        let bounding_box = unsafe { BoundingBox::from_bytes(&data[..BOUNDING_BOX_SIZE_IN_BYTES]) };
         let data = &data[BOUNDING_BOX_SIZE_IN_BYTES..];
 
         // 2. Then retrieve the offsets
@@ -109,7 +111,7 @@ impl<'a> ZultiPolygons<'a> {
             .get(index + 1)
             .unwrap_or(&(self.bytes.len() as u32));
         let bytes = &self.bytes[offset as usize..next_offset as usize];
-        Some(Zolygon::from_bytes(bytes))
+        Some(unsafe { Zolygon::from_bytes(bytes) })
     }
 
     pub fn len(&self) -> usize {
@@ -365,17 +367,17 @@ mod tests {
         let first_zolygon_bytes = &writer[current_offset + expected_offsets[0] as usize
             ..current_offset + expected_offsets[1] as usize];
         assert_compact_debug_snapshot!(first_zolygon_bytes, @"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]");
-        let first_zolygon = Zolygon::from_bytes(first_zolygon_bytes);
+        let first_zolygon = unsafe { Zolygon::from_bytes(first_zolygon_bytes) };
         assert_compact_debug_snapshot!(first_zolygon, @"Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }, coords: [Coord { x: 0.0, y: 0.0 }, Coord { x: 10.0, y: 0.0 }, Coord { x: 0.0, y: 10.0 }, Coord { x: 0.0, y: 0.0 }] }");
         assert_eq!(first_zolygon, first_polygon);
         let second_zolygon_bytes = &writer[current_offset + expected_offsets[1] as usize..];
         assert_compact_debug_snapshot!(second_zolygon_bytes, @"[0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 52, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 52, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 52, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64]");
-        let second_zolygon = Zolygon::from_bytes(second_zolygon_bytes);
+        let second_zolygon = unsafe { Zolygon::from_bytes(second_zolygon_bytes) };
         assert_compact_debug_snapshot!(second_zolygon, @"Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 10.0, y: 0.0 }, top_right: Coord { x: 20.0, y: 10.0 } }, coords: [Coord { x: 10.0, y: 10.0 }, Coord { x: 20.0, y: 0.0 }, Coord { x: 20.0, y: 10.0 }, Coord { x: 10.0, y: 10.0 }] }");
         assert_eq!(second_zolygon, second_polygon);
 
         // Try to parse the zulti polygon
-        let zulti_polygon = ZultiPolygons::from_bytes(&writer);
+        let zulti_polygon = unsafe { ZultiPolygons::from_bytes(&writer) };
         assert_snapshot!(zulti_polygon.len(), @"2");
         assert_compact_debug_snapshot!(zulti_polygon.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 20.0, y: 10.0 } }");
         assert_compact_debug_snapshot!(zulti_polygon.offsets, @"[0, 96]");
@@ -501,12 +503,12 @@ mod tests {
         // Now there should be the first zolygon at the offset 0
         let first_zolygon_bytes = &writer[current_offset + expected_offsets[0] as usize..];
         assert_compact_debug_snapshot!(first_zolygon_bytes, @"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]");
-        let first_zolygon = Zolygon::from_bytes(first_zolygon_bytes);
+        let first_zolygon = unsafe { Zolygon::from_bytes(first_zolygon_bytes) };
         assert_compact_debug_snapshot!(first_zolygon, @"Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }, coords: [Coord { x: 0.0, y: 0.0 }, Coord { x: 10.0, y: 0.0 }, Coord { x: 0.0, y: 10.0 }, Coord { x: 0.0, y: 0.0 }] }");
         assert_eq!(first_zolygon, first_polygon);
 
         // Try to parse the zulti polygon
-        let zulti_polygon = ZultiPolygons::from_bytes(&writer);
+        let zulti_polygon = unsafe { ZultiPolygons::from_bytes(&writer) };
         assert_snapshot!(zulti_polygon.len(), @"1");
         assert_compact_debug_snapshot!(zulti_polygon.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }");
         assert_compact_debug_snapshot!(zulti_polygon.offsets, @"[0]");
@@ -593,7 +595,7 @@ mod tests {
         assert_compact_debug_snapshot!(padding, @"[0, 0, 0, 0]");
 
         // Try to parse the zulti polygon
-        let zulti_polygon = ZultiPolygons::from_bytes(&writer);
+        let zulti_polygon = unsafe { ZultiPolygons::from_bytes(&writer) };
         assert_snapshot!(zulti_polygon.len(), @"0");
         assert_compact_debug_snapshot!(zulti_polygon.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 0.0, y: 0.0 } }");
         assert_compact_debug_snapshot!(zulti_polygon.offsets, @"[]");
@@ -654,26 +656,26 @@ mod tests {
 
         let mut buf = Vec::new();
         Zolygon::write_from_geometry(&mut buf, &polygon).unwrap();
-        let zolygon = Zolygon::from_bytes(&buf);
+        let zolygon = unsafe { Zolygon::from_bytes(&buf) };
         let mut buf = Vec::new();
         Zolygon::write_from_geometry(&mut buf, &contained_polygon).unwrap();
-        let contained_zolygon = Zolygon::from_bytes(&buf);
+        let contained_zolygon = unsafe { Zolygon::from_bytes(&buf) };
         let mut buf = Vec::new();
         Zolygon::write_from_geometry(&mut buf, &unrelated_polygon).unwrap();
-        let unrelated_zolygon = Zolygon::from_bytes(&buf);
+        let unrelated_zolygon = unsafe { Zolygon::from_bytes(&buf) };
 
         let mut buf = Vec::new();
         ZultiPolygons::write_from_geometry(&mut buf, &multi_contains).unwrap();
-        let multi_contains = ZultiPolygons::from_bytes(&buf);
+        let multi_contains = unsafe { ZultiPolygons::from_bytes(&buf) };
         let mut buf = Vec::new();
         ZultiPolygons::write_from_geometry(&mut buf, &multi_contains_and_contained).unwrap();
-        let multi_contains_and_contained = ZultiPolygons::from_bytes(&buf);
+        let multi_contains_and_contained = unsafe { ZultiPolygons::from_bytes(&buf) };
         let mut buf = Vec::new();
         ZultiPolygons::write_from_geometry(&mut buf, &multi_contains_twice).unwrap();
-        let multi_contains_twice = ZultiPolygons::from_bytes(&buf);
+        let multi_contains_twice = unsafe { ZultiPolygons::from_bytes(&buf) };
         let mut buf = Vec::new();
         ZultiPolygons::write_from_geometry(&mut buf, &multi_contained_twice).unwrap();
-        let multi_contained_twice = ZultiPolygons::from_bytes(&buf);
+        let multi_contained_twice = unsafe { ZultiPolygons::from_bytes(&buf) };
 
         assert_compact_debug_snapshot!(multi_contains.all_relation(&contained_zolygon), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
         assert_compact_debug_snapshot!(multi_contains_and_contained.all_relation(&contained_zolygon), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");

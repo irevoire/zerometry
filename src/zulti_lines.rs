@@ -29,9 +29,11 @@ impl<'a> ZultiLines<'a> {
         }
     }
 
-    pub fn from_bytes(data: &'a [u8]) -> Self {
+    /// # Safety
+    /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
+    pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
         // 1. Retrieve the bounding box
-        let bounding_box = BoundingBox::from_bytes(&data[..BOUNDING_BOX_SIZE_IN_BYTES]);
+        let bounding_box = unsafe { BoundingBox::from_bytes(&data[..BOUNDING_BOX_SIZE_IN_BYTES]) };
         let data = &data[BOUNDING_BOX_SIZE_IN_BYTES..];
 
         // 2. Then retrieve the offsets
@@ -110,7 +112,7 @@ impl<'a> ZultiLines<'a> {
             .get(index + 1)
             .unwrap_or(&(self.bytes.len() as u32));
         let bytes = &self.bytes[offset as usize..next_offset as usize];
-        Some(Zine::from_bytes(bytes))
+        Some(unsafe { Zine::from_bytes(bytes) })
     }
 
     pub fn len(&self) -> usize {
@@ -343,17 +345,17 @@ mod tests {
         let first_zine_bytes = &writer[current_offset + expected_offsets[0] as usize
             ..current_offset + expected_offsets[1] as usize];
         assert_compact_debug_snapshot!(first_zine_bytes, @"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64]");
-        let first_zine = Zine::from_bytes(first_zine_bytes);
+        let first_zine = unsafe { Zine::from_bytes(first_zine_bytes) };
         assert_compact_debug_snapshot!(first_zine, @"Zine { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }, points: [Zoint { lng: 0.0, lat: 0.0 }, Zoint { lng: 10.0, lat: 0.0 }, Zoint { lng: 0.0, lat: 10.0 }] }");
         assert_eq!(first_zine, first_line);
         let second_zine_bytes = &writer[current_offset + expected_offsets[1] as usize..];
         assert_compact_debug_snapshot!(second_zine_bytes, @"[0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 52, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 52, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 52, 64, 0, 0, 0, 0, 0, 0, 36, 64]");
-        let second_zine = Zine::from_bytes(second_zine_bytes);
+        let second_zine = unsafe { Zine::from_bytes(second_zine_bytes) };
         assert_compact_debug_snapshot!(second_zine, @"Zine { bounding_box: BoundingBox { bottom_left: Coord { x: 10.0, y: 0.0 }, top_right: Coord { x: 20.0, y: 10.0 } }, points: [Zoint { lng: 10.0, lat: 10.0 }, Zoint { lng: 20.0, lat: 0.0 }, Zoint { lng: 20.0, lat: 10.0 }] }");
         assert_eq!(second_zine, second_line);
 
         // Try to parse the zulti lines
-        let zulti_lines = ZultiLines::from_bytes(&writer);
+        let zulti_lines = unsafe { ZultiLines::from_bytes(&writer) };
         assert_snapshot!(zulti_lines.len(), @"2");
         assert_compact_debug_snapshot!(zulti_lines.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 20.0, y: 10.0 } }");
         assert_compact_debug_snapshot!(zulti_lines.offsets, @"[0, 80]");
@@ -468,12 +470,12 @@ mod tests {
         // Now there should be the first zine at the offset 0
         let first_zine_bytes = &writer[current_offset + expected_offsets[0] as usize..];
         assert_compact_debug_snapshot!(first_zine_bytes, @"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 64]");
-        let first_zine = Zine::from_bytes(first_zine_bytes);
+        let first_zine = unsafe { Zine::from_bytes(first_zine_bytes) };
         assert_compact_debug_snapshot!(first_zine, @"Zine { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }, points: [Zoint { lng: 0.0, lat: 0.0 }, Zoint { lng: 10.0, lat: 0.0 }, Zoint { lng: 0.0, lat: 10.0 }] }");
         assert_eq!(first_zine, first_line);
 
         // Try to parse the zulti lines
-        let zulti_polygon = ZultiLines::from_bytes(&writer);
+        let zulti_polygon = unsafe { ZultiLines::from_bytes(&writer) };
         assert_snapshot!(zulti_polygon.len(), @"1");
         assert_compact_debug_snapshot!(zulti_polygon.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 10.0, y: 10.0 } }");
         assert_compact_debug_snapshot!(zulti_polygon.offsets, @"[0]");
@@ -556,7 +558,7 @@ mod tests {
         assert_compact_debug_snapshot!(padding, @"[0, 0, 0, 0]");
 
         // Try to parse the zulti lines
-        let zulti_lines = ZultiLines::from_bytes(&writer);
+        let zulti_lines = unsafe { ZultiLines::from_bytes(&writer) };
         assert_snapshot!(zulti_lines.len(), @"0");
         assert_compact_debug_snapshot!(zulti_lines.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 0.0, y: 0.0 } }");
         assert_compact_debug_snapshot!(zulti_lines.offsets, @"[]");
@@ -625,31 +627,31 @@ mod tests {
 
         let mut buf = Vec::new();
         ZultiLines::write_from_geometry(&mut buf, &multi_line_strict_inside).unwrap();
-        let multi_line_strict_inside = ZultiLines::from_bytes(&buf);
+        let multi_line_strict_inside = unsafe { ZultiLines::from_bytes(&buf) };
 
         let mut buf = Vec::new();
         ZultiLines::write_from_geometry(&mut buf, &multi_line_outside).unwrap();
-        let multi_line_outside = ZultiLines::from_bytes(&buf);
+        let multi_line_outside = unsafe { ZultiLines::from_bytes(&buf) };
 
         let mut buf = Vec::new();
         ZultiLines::write_from_geometry(&mut buf, &multi_line_inside).unwrap();
-        let multi_line_inside = ZultiLines::from_bytes(&buf);
+        let multi_line_inside = unsafe { ZultiLines::from_bytes(&buf) };
 
         let mut buf = Vec::new();
         ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_inside).unwrap();
-        let multi_polygons_inside = ZultiPolygons::from_bytes(&buf);
+        let multi_polygons_inside = unsafe { ZultiPolygons::from_bytes(&buf) };
         let mut buf = Vec::new();
         ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_outside).unwrap();
-        let multi_polygons_outside = ZultiPolygons::from_bytes(&buf);
+        let multi_polygons_outside = unsafe { ZultiPolygons::from_bytes(&buf) };
         let mut buf = Vec::new();
         ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_intersect).unwrap();
-        let multi_polygons_intersect = ZultiPolygons::from_bytes(&buf);
+        let multi_polygons_intersect = unsafe { ZultiPolygons::from_bytes(&buf) };
         let mut buf = Vec::new();
         ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_in_and_out).unwrap();
-        let multi_polygons_in_and_out = ZultiPolygons::from_bytes(&buf);
+        let multi_polygons_in_and_out = unsafe { ZultiPolygons::from_bytes(&buf) };
         let mut buf = Vec::new();
         ZultiPolygons::write_from_geometry(&mut buf, &multi_polygons_all).unwrap();
-        let multi_polygons_all = ZultiPolygons::from_bytes(&buf);
+        let multi_polygons_all = unsafe { ZultiPolygons::from_bytes(&buf) };
 
         assert_compact_debug_snapshot!(multi_line_strict_inside.all_relation(&multi_polygons_inside), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(false), disjoint: Some(false) }");
         assert_compact_debug_snapshot!(multi_line_strict_inside.all_relation(&multi_polygons_outside), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");

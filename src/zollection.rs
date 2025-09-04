@@ -47,9 +47,11 @@ impl<'a> Zollection<'a> {
         }
     }
 
-    pub fn from_bytes(data: &'a [u8]) -> Self {
+    /// # Safety
+    /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
+    pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
         // 1. Retrieve the bounding box
-        let bounding_box = BoundingBox::from_bytes(&data[..BOUNDING_BOX_SIZE_IN_BYTES]);
+        let bounding_box = unsafe { BoundingBox::from_bytes(&data[..BOUNDING_BOX_SIZE_IN_BYTES]) };
         let data = &data[BOUNDING_BOX_SIZE_IN_BYTES..];
 
         // 2. Then retrieve the offsets
@@ -63,13 +65,13 @@ impl<'a> Zollection<'a> {
 
         // 3. Retrieve the internal structures
         let points = &data[..lines_offset];
-        let points = ZultiPoints::from_bytes(points);
+        let points = unsafe { ZultiPoints::from_bytes(points) };
 
         let lines = &data[lines_offset..polygons_offset];
-        let lines = ZultiLines::from_bytes(lines);
+        let lines = unsafe { ZultiLines::from_bytes(lines) };
 
         let polygons = &data[polygons_offset..];
-        let polygons = ZultiPolygons::from_bytes(polygons);
+        let polygons = unsafe { ZultiPolygons::from_bytes(polygons) };
 
         Self {
             bounding_box,
@@ -468,7 +470,7 @@ mod tests {
         let points_bytes = &writer[current_offset..current_offset + lines_offset as usize];
         let points_f64: &[f64] = cast_slice(points_bytes);
         assert_compact_debug_snapshot!(points_f64, @"[1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 4.0]");
-        let points = ZultiPoints::from_bytes(points_bytes);
+        let points = unsafe { ZultiPoints::from_bytes(points_bytes) };
         assert_compact_debug_snapshot!(points, @"ZultiPoints { bounding_box: BoundingBox { bottom_left: Coord { x: 1.0, y: 2.0 }, top_right: Coord { x: 3.0, y: 4.0 } }, points: [Zoint { lng: 1.0, lat: 2.0 }, Zoint { lng: 3.0, lat: 4.0 }] }");
         assert_eq!(points, multi_points);
 
@@ -476,19 +478,19 @@ mod tests {
         let lines_bytes = &writer
             [current_offset + lines_offset as usize..current_offset + polygon_offset as usize];
         assert_compact_debug_snapshot!(lines_bytes, @"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 64, 0, 0, 0, 0, 0, 0, 240, 63, 2, 0, 0, 0, 0, 0, 0, 0, 80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 240, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 63, 0, 0, 0, 0, 0, 0, 240, 63, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 240, 63, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 0, 240, 63, 0, 0, 0, 0, 0, 0, 16, 64, 0, 0, 0, 0, 0, 0, 240, 63, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 0, 240, 63, 0, 0, 0, 0, 0, 0, 16, 64, 0, 0, 0, 0, 0, 0, 240, 63]");
-        let lines = ZultiLines::from_bytes(lines_bytes);
+        let lines = unsafe { ZultiLines::from_bytes(lines_bytes) };
         assert_compact_debug_snapshot!(lines, @"ZultiLines { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 4.0, y: 1.0 } }, zines: [Zine { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 2.0, y: 1.0 } }, points: [Zoint { lng: 0.0, lat: 0.0 }, Zoint { lng: 1.0, lat: 1.0 }, Zoint { lng: 2.0, lat: 1.0 }] }, Zine { bounding_box: BoundingBox { bottom_left: Coord { x: 3.0, y: 1.0 }, top_right: Coord { x: 4.0, y: 1.0 } }, points: [Zoint { lng: 3.0, lat: 1.0 }, Zoint { lng: 4.0, lat: 1.0 }] }] }");
         assert_eq!(lines, multi_lines);
 
         // Now there should be the first multi lines at the offset line to the offset polygon
         let polygons_bytes = &writer[current_offset + polygon_offset as usize..];
         assert_compact_debug_snapshot!(polygons_bytes, @"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 64, 0, 0, 0, 0, 0, 0, 20, 64, 2, 0, 0, 0, 0, 0, 0, 0, 96, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 63, 0, 0, 0, 0, 0, 0, 240, 63, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 0, 20, 64, 0, 0, 0, 0, 0, 0, 20, 64, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 0, 16, 64, 0, 0, 0, 0, 0, 0, 16, 64, 0, 0, 0, 0, 0, 0, 20, 64, 0, 0, 0, 0, 0, 0, 20, 64, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 0, 8, 64]");
-        let polygons = ZultiPolygons::from_bytes(polygons_bytes);
+        let polygons = unsafe { ZultiPolygons::from_bytes(polygons_bytes) };
         assert_compact_debug_snapshot!(polygons, @"ZultiPolygons { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 5.0, y: 5.0 } }, zolygons: [Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 2.0, y: 2.0 } }, coords: [Coord { x: 0.0, y: 0.0 }, Coord { x: 1.0, y: 1.0 }, Coord { x: 2.0, y: 2.0 }, Coord { x: 0.0, y: 0.0 }] }, Zolygon { bounding_box: BoundingBox { bottom_left: Coord { x: 3.0, y: 3.0 }, top_right: Coord { x: 5.0, y: 5.0 } }, coords: [Coord { x: 3.0, y: 3.0 }, Coord { x: 4.0, y: 4.0 }, Coord { x: 5.0, y: 5.0 }, Coord { x: 3.0, y: 3.0 }] }] }");
         assert_eq!(polygons, multi_polygons);
 
         // Try to parse the whole collection
-        let zollection = Zollection::from_bytes(&writer);
+        let zollection = unsafe { Zollection::from_bytes(&writer) };
         assert_compact_debug_snapshot!(zollection.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 5.0, y: 5.0 } }");
         assert_debug_snapshot!(zollection, @r"
         Zollection {
@@ -697,7 +699,7 @@ mod tests {
         let points_bytes = &writer[current_offset..current_offset + lines_offset as usize];
         let points_f64: &[f64] = cast_slice(points_bytes);
         assert_compact_debug_snapshot!(points_f64, @"[0.0, 0.0, 0.0, 0.0]");
-        let points = ZultiPoints::from_bytes(points_bytes);
+        let points = unsafe { ZultiPoints::from_bytes(points_bytes) };
         assert_compact_debug_snapshot!(points, @"ZultiPoints { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 0.0, y: 0.0 } }, points: [] }");
         assert!(points.is_empty());
 
@@ -705,19 +707,19 @@ mod tests {
         let lines_bytes = &writer
             [current_offset + lines_offset as usize..current_offset + polygon_offset as usize];
         assert_compact_debug_snapshot!(lines_bytes, @"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]");
-        let lines = ZultiLines::from_bytes(lines_bytes);
+        let lines = unsafe { ZultiLines::from_bytes(lines_bytes) };
         assert_compact_debug_snapshot!(lines, @"ZultiLines { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 0.0, y: 0.0 } }, zines: [] }");
         assert!(lines.is_empty());
 
         // Now there should be the first multi lines at the offset line to the offset polygon
         let polygons_bytes = &writer[current_offset + polygon_offset as usize..];
         assert_compact_debug_snapshot!(polygons_bytes, @"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]");
-        let polygons = ZultiPolygons::from_bytes(polygons_bytes);
+        let polygons = unsafe { ZultiPolygons::from_bytes(polygons_bytes) };
         assert_compact_debug_snapshot!(polygons, @"ZultiPolygons { bounding_box: BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 0.0, y: 0.0 } }, zolygons: [] }");
         assert!(polygons.is_empty());
 
         // Try to parse the whole collection
-        let zollection = Zollection::from_bytes(&writer);
+        let zollection = unsafe { Zollection::from_bytes(&writer) };
         assert_compact_debug_snapshot!(zollection.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 0.0, y: 0.0 }, top_right: Coord { x: 0.0, y: 0.0 } }");
         assert_debug_snapshot!(zollection, @r"
         Zollection {
@@ -795,7 +797,7 @@ mod tests {
         Zollection::write_from_geometry(&mut writer, &collection).unwrap();
 
         // Try to parse the whole collection
-        let zollection = Zollection::from_bytes(&writer);
+        let zollection = unsafe { Zollection::from_bytes(&writer) };
         assert_compact_debug_snapshot!(zollection.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 1.0, y: 2.0 }, top_right: Coord { x: 3.0, y: 4.0 } }");
         assert_debug_snapshot!(zollection, @r"
         Zollection {
@@ -886,7 +888,7 @@ mod tests {
             ]),
         )
         .unwrap();
-        let zolygon = Zollection::from_bytes(&buf);
+        let zolygon = unsafe { Zollection::from_bytes(&buf) };
         assert_compact_debug_snapshot!(zolygon.all_relation(&zolygon), @"OutputRelation { contains: Some(true), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
 
         let mut buf = Vec::new();
@@ -895,7 +897,7 @@ mod tests {
             &GeometryCollection(vec![Geometry::from(point), Geometry::from(line.clone())]),
         )
         .unwrap();
-        let other = Zollection::from_bytes(&buf);
+        let other = unsafe { Zollection::from_bytes(&buf) };
         assert_compact_debug_snapshot!(zolygon.all_relation(&other), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
         assert_compact_debug_snapshot!(other.all_relation(&zolygon), @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(true), strict_contained: Some(true), intersect: Some(true), disjoint: Some(false) }");
 
@@ -909,7 +911,7 @@ mod tests {
             ]),
         )
         .unwrap();
-        let other = Zollection::from_bytes(&buf);
+        let other = unsafe { Zollection::from_bytes(&buf) };
         assert_compact_debug_snapshot!(zolygon.all_relation(&other), @"OutputRelation { contains: Some(true), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
 
         let mut buf = Vec::new();
@@ -923,7 +925,7 @@ mod tests {
             ]),
         )
         .unwrap();
-        let other = Zollection::from_bytes(&buf);
+        let other = unsafe { Zollection::from_bytes(&buf) };
         assert_compact_debug_snapshot!(zolygon.all_relation(&other), @"OutputRelation { contains: Some(true), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(true), disjoint: Some(false) }");
 
         let mut buf = Vec::new();
@@ -937,7 +939,7 @@ mod tests {
             ]),
         )
         .unwrap();
-        let other = Zollection::from_bytes(&buf);
+        let other = unsafe { Zollection::from_bytes(&buf) };
         assert_compact_debug_snapshot!(zolygon.all_relation(&other), @"OutputRelation { contains: Some(true), strict_contains: Some(false), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
 
         let mut buf = Vec::new();
@@ -950,7 +952,7 @@ mod tests {
             ]),
         )
         .unwrap();
-        let other = Zollection::from_bytes(&buf);
+        let other = unsafe { Zollection::from_bytes(&buf) };
         assert_compact_debug_snapshot!(zolygon.all_relation(&other), @"OutputRelation { contains: Some(true), strict_contains: Some(true), contained: Some(true), strict_contained: Some(false), intersect: Some(false), disjoint: Some(false) }");
     }
 }

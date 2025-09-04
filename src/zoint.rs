@@ -19,8 +19,10 @@ impl<'a> Zoint<'a> {
         Self { coord }
     }
 
-    pub fn from_bytes(data: &'a [u8]) -> Self {
-        let coord = Coord::from_bytes(data);
+    /// # Safety
+    /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
+    pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
+        let coord = unsafe { Coord::from_bytes(data) };
         Self::new(coord)
     }
 
@@ -146,7 +148,7 @@ mod tests {
         Zoint::write_from_geometry(&mut buffer, &Point::new(1.0, 2.0)).unwrap();
         let input: &[f64] = cast_slice(&buffer);
         assert_compact_debug_snapshot!(input, @"[1.0, 2.0]");
-        let zoint = Zoint::from_bytes(&buffer);
+        let zoint = unsafe { Zoint::from_bytes(&buffer) };
         assert_compact_debug_snapshot!(zoint.coord(), @"Coord { x: 1.0, y: 2.0 }");
     }
 
@@ -157,7 +159,7 @@ mod tests {
             let point = Point::new(lng, lat);
             let mut buffer = Vec::new();
             Zoint::write_from_geometry(&mut buffer, &point).unwrap();
-            let zoint = Zoint::from_bytes(&buffer);
+            let zoint = unsafe { Zoint::from_bytes(&buffer) };
             assert_eq!(zoint, point);
         }
     }

@@ -15,8 +15,10 @@ pub struct Segment<'a> {
 }
 
 impl<'a> Segment<'a> {
-    pub fn from_bytes(data: &'a [u8]) -> Self {
-        Self::from_coords(Coords::from_bytes(data))
+    /// # Safety
+    /// The data must be aligned on 64bit and contains exactly 4 f64.
+    pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
+        Self::from_coords(unsafe { Coords::from_bytes(data) })
     }
 
     pub fn from_slice(data: &'a [f64]) -> Self {
@@ -70,7 +72,7 @@ mod tests {
     #[test]
     fn test_segment_from_bytes() {
         let data = [1.0, 2.0, 3.0, 4.0];
-        let bb = Segment::from_bytes(cast_slice(&data));
+        let bb = unsafe { Segment::from_bytes(cast_slice(&data)) };
         insta::assert_debug_snapshot!(bb, @r"
         Segment {
             start: Coord {
@@ -89,28 +91,28 @@ mod tests {
     #[should_panic]
     fn test_segment_from_bytes_panic_on_missing_point_bytes() {
         let data = [1.0, 2.0];
-        Segment::from_bytes(cast_slice(&data));
+        unsafe { Segment::from_bytes(cast_slice(&data)) };
     }
 
     #[test]
     #[should_panic]
     fn test_segment_from_bytes_panic_on_too_many_point_bytes() {
         let data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
-        Segment::from_bytes(cast_slice(&data));
+        unsafe { Segment::from_bytes(cast_slice(&data)) };
     }
 
     #[test]
     #[should_panic]
     fn test_segment_from_bytes_panic_on_too_long_bytes() {
         let data = [1.0, 2.0, 3.0, 4.0, 5.0];
-        Segment::from_bytes(cast_slice(&data));
+        unsafe { Segment::from_bytes(cast_slice(&data)) };
     }
 
     #[test]
     #[should_panic]
     fn test_segment_from_bytes_panic_on_unaligned_bytes() {
         let data = [1.0, 2.0, 3.0, 4.0, 5.0];
-        Segment::from_bytes(&cast_slice(&data)[1..]);
+        unsafe { Segment::from_bytes(&cast_slice(&data)[1..]) };
     }
 
     #[test]

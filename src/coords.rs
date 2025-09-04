@@ -10,7 +10,9 @@ pub struct Coords {
 }
 
 impl<'a> Coords {
-    pub fn from_bytes(data: &'a [u8]) -> &'a Self {
+    /// # Safety
+    /// The data must contains and even number of f64 and be aligned on 64 bits.
+    pub unsafe fn from_bytes(data: &'a [u8]) -> &'a Self {
         debug_assert!(
             data.len() % COORD_SIZE_IN_BYTES == 0,
             "Not an even number of scalars"
@@ -80,7 +82,7 @@ mod tests {
     #[test]
     fn test_basic_create_coords_from_bytes() {
         let data = [1.0, 2.0, 3.0, 4.0];
-        let coords = Coords::from_bytes(cast_slice(&data));
+        let coords = unsafe { Coords::from_bytes(cast_slice(&data)) };
         // len works
         assert_eq!(coords.len(), 2);
         // index works
@@ -104,21 +106,21 @@ mod tests {
     #[should_panic]
     fn test_coords_panic_on_too_short_bytes() {
         let data = [1.0];
-        Coords::from_bytes(cast_slice(&data));
+        unsafe { Coords::from_bytes(cast_slice(&data)) };
     }
 
     #[test]
     #[should_panic]
     fn test_coord_panic_on_bad_number_of_floats_from_bytes() {
         let data = [1.0, 2.0, 3.0];
-        Coords::from_bytes(cast_slice(&data));
+        unsafe { Coords::from_bytes(cast_slice(&data)) };
     }
 
     #[test]
     #[should_panic]
     fn test_coord_panic_on_unaligned_bytes() {
         let data = [1.0, 2.0, 3.0];
-        Coords::from_bytes(&cast_slice(&data)[1..]);
+        unsafe { Coords::from_bytes(&cast_slice(&data)[1..]) };
     }
 
     // ====== TEST ON SLICES ======

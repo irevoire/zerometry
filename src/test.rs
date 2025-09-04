@@ -28,7 +28,7 @@ fn test_mono_multipolygon_contains_points() {
         &geo_types::Geometry::MultiPolygon(wrong_multipolygon.clone()),
     )
     .unwrap();
-    let wrong_multipolygon = Zerometry::from_bytes(&wrong_buffer).unwrap();
+    let wrong_multipolygon = unsafe { Zerometry::from_bytes(&wrong_buffer).unwrap() };
     let wrong = wrong_multipolygon.all_relation(&point);
     assert_compact_debug_snapshot!(wrong, @"OutputRelation { contains: Some(false), strict_contains: Some(false), contained: Some(false), strict_contained: Some(false), intersect: Some(false), disjoint: Some(true) }");
 
@@ -52,7 +52,7 @@ fn test_mono_multipolygon_contains_points() {
         &geo_types::Geometry::MultiPolygon(right_multipolygon.clone()),
     )
     .unwrap();
-    let right_multipolygon = Zerometry::from_bytes(&right_buffer).unwrap();
+    let right_multipolygon = unsafe { Zerometry::from_bytes(&right_buffer).unwrap() };
     println!("right_multipolygon: {}", print_geojson(&right_multipolygon));
 
     let right = right_multipolygon.all_relation(&point);

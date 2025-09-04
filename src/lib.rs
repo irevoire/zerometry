@@ -15,7 +15,7 @@ mod zulti_lines;
 mod zulti_points;
 mod zulti_polygons;
 
-use std::mem;
+use std::{io, mem};
 
 pub use bounding_box::BoundingBox;
 pub use coord::Coord;
@@ -48,18 +48,43 @@ pub enum Zerometry<'a> {
 impl<'a> Zerometry<'a> {
     /// Create a `Zerometry` from a slice of bytes.
     /// See [`Self::write_from_geometry`] to create the slice of bytes.
-    pub fn from_bytes(data: &'a [u8]) -> Result<Self, std::io::Error> {
-        let tag = u64::from_ne_bytes(data[..mem::size_of::<u64>()].try_into().unwrap());
+    ///
+    /// # Safety
+    /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
+    pub unsafe fn from_bytes(data: &'a [u8]) -> Result<Self, std::io::Error> {
+        if data.len() < mem::size_of::<u64>() {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                format!(
+                    "Was expecting at least {} bytes but found {}",
+                    mem::size_of::<u64>(),
+                    data.len()
+                ),
+            ));
+        }
+        let tag = u64::from_ne_bytes(
+            data[..mem::size_of::<u64>()]
+                .try_into()
+                .map_err(io::Error::other)?,
+        );
         let data = &data[mem::size_of::<u64>()..];
         match tag {
-            0 => Ok(Zerometry::Point(Zoint::from_bytes(data))),
-            1 => Ok(Zerometry::MultiPoints(ZultiPoints::from_bytes(data))),
-            2 => Ok(Zerometry::Polygon(Zolygon::from_bytes(data))),
-            3 => Ok(Zerometry::MultiPolygon(ZultiPolygons::from_bytes(data))),
+            0 => Ok(Zerometry::Point(unsafe { Zoint::from_bytes(data) })),
+            1 => Ok(Zerometry::MultiPoints(unsafe {
+                ZultiPoints::from_bytes(data)
+            })),
+            2 => Ok(Zerometry::Polygon(unsafe { Zolygon::from_bytes(data) })),
+            3 => Ok(Zerometry::MultiPolygon(unsafe {
+                ZultiPolygons::from_bytes(data)
+            })),
             // They're located after because it would be a db-breaking to edit the already existing tags
-            4 => Ok(Zerometry::Line(Zine::from_bytes(data))),
-            5 => Ok(Zerometry::MultiLines(ZultiLines::from_bytes(data))),
-            6 => Ok(Zerometry::Collection(Zollection::from_bytes(data))),
+            4 => Ok(Zerometry::Line(unsafe { Zine::from_bytes(data) })),
+            5 => Ok(Zerometry::MultiLines(unsafe {
+                ZultiLines::from_bytes(data)
+            })),
+            6 => Ok(Zerometry::Collection(unsafe {
+                Zollection::from_bytes(data)
+            })),
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Invalid zerometry tag",
@@ -315,7 +340,7 @@ impl<'a> RelationBetweenShapes<Geometry<f64>> for Zerometry<'a> {
     fn relation(&self, other: &Geometry<f64>, relation: InputRelation) -> OutputRelation {
         let mut buffer = Vec::new();
         Zerometry::write_from_geometry(&mut buffer, other).unwrap();
-        let other = Zerometry::from_bytes(&buffer).unwrap();
+        let other = unsafe { Zerometry::from_bytes(&buffer).unwrap() };
         self.relation(&other, relation)
     }
 }
@@ -324,7 +349,7 @@ impl<'a> RelationBetweenShapes<Zerometry<'a>> for Geometry<f64> {
     fn relation(&self, other: &Zerometry<'a>, relation: InputRelation) -> OutputRelation {
         let mut buffer = Vec::new();
         Zerometry::write_from_geometry(&mut buffer, self).unwrap();
-        let this = Zerometry::from_bytes(&buffer).unwrap();
+        let this = unsafe { Zerometry::from_bytes(&buffer).unwrap() };
         this.relation(other, relation)
     }
 }
@@ -333,7 +358,7 @@ impl<'a> RelationBetweenShapes<Polygon<f64>> for Zerometry<'a> {
     fn relation(&self, other: &Polygon<f64>, relation: InputRelation) -> OutputRelation {
         let mut buffer = Vec::new();
         Zerometry::write_from_geometry(&mut buffer, &Geometry::Polygon(other.clone())).unwrap();
-        let other = Zerometry::from_bytes(&buffer).unwrap();
+        let other = unsafe { Zerometry::from_bytes(&buffer).unwrap() };
         self.relation(&other, relation)
     }
 }
@@ -343,7 +368,7 @@ impl<'a> RelationBetweenShapes<MultiPolygon<f64>> for Zerometry<'a> {
         let mut buffer = Vec::new();
         Zerometry::write_from_geometry(&mut buffer, &Geometry::MultiPolygon(other.clone()))
             .unwrap();
-        let other = Zerometry::from_bytes(&buffer).unwrap();
+        let other = unsafe { Zerometry::from_bytes(&buffer).unwrap() };
         self.relation(&other, relation)
     }
 }
@@ -379,7 +404,7 @@ mod zerometry_test {
         let point = geometry::Geometry::Point(geometry::Point::new(45.0, 65.0));
         let mut buf = Vec::new();
         Zerometry::write_from_geometry(&mut buf, &point).unwrap();
-        let zoint = Zerometry::from_bytes(&buf).unwrap();
+        let zoint = unsafe { Zerometry::from_bytes(&buf).unwrap() };
         assert_eq!(zoint, point);
     }
 
@@ -388,7 +413,7 @@ mod zerometry_test {
         let multi_point = geometry::Geometry::MultiPoint(geometry::MultiPoint::new(vec![]));
         let mut buf = Vec::new();
         Zerometry::write_from_geometry(&mut buf, &multi_point).unwrap();
-        let zulti_point = Zerometry::from_bytes(&buf).unwrap();
+        let zulti_point = unsafe { Zerometry::from_bytes(&buf).unwrap() };
         assert_eq!(zulti_point, multi_point);
 
         let multi_point = geometry::Geometry::MultiPoint(geometry::MultiPoint::new(vec![
@@ -399,7 +424,7 @@ mod zerometry_test {
         ]));
         let mut buf = Vec::new();
         Zerometry::write_from_geometry(&mut buf, &multi_point).unwrap();
-        let zulti_point = Zerometry::from_bytes(&buf).unwrap();
+        let zulti_point = unsafe { Zerometry::from_bytes(&buf).unwrap() };
         assert_eq!(zulti_point, multi_point);
     }
 
@@ -408,7 +433,7 @@ mod zerometry_test {
         let line_string = geometry::Geometry::LineString(geometry::LineString::new(vec![]));
         let mut buf = Vec::new();
         Zerometry::write_from_geometry(&mut buf, &line_string).unwrap();
-        let zine_string = Zerometry::from_bytes(&buf).unwrap();
+        let zine_string = unsafe { Zerometry::from_bytes(&buf).unwrap() };
         assert_eq!(zine_string, line_string);
 
         let line_string = geometry::Geometry::LineString(geometry::LineString::new(vec![
@@ -418,7 +443,7 @@ mod zerometry_test {
         ]));
         let mut buf = Vec::new();
         Zerometry::write_from_geometry(&mut buf, &line_string).unwrap();
-        let zine_string = Zerometry::from_bytes(&buf).unwrap();
+        let zine_string = unsafe { Zerometry::from_bytes(&buf).unwrap() };
         assert_eq!(zine_string, line_string);
     }
 
@@ -428,7 +453,7 @@ mod zerometry_test {
             geometry::Geometry::MultiLineString(geometry::MultiLineString::new(vec![]));
         let mut buf = Vec::new();
         Zerometry::write_from_geometry(&mut buf, &multi_line_string).unwrap();
-        let zulti_line_string = Zerometry::from_bytes(&buf).unwrap();
+        let zulti_line_string = unsafe { Zerometry::from_bytes(&buf).unwrap() };
         assert_eq!(zulti_line_string, multi_line_string);
 
         let multi_line_string =
@@ -447,7 +472,7 @@ mod zerometry_test {
             ]));
         let mut buf = Vec::new();
         Zerometry::write_from_geometry(&mut buf, &multi_line_string).unwrap();
-        let zulti_line_string = Zerometry::from_bytes(&buf).unwrap();
+        let zulti_line_string = unsafe { Zerometry::from_bytes(&buf).unwrap() };
         assert_eq!(zulti_line_string, multi_line_string);
 
         let multi_line_string =
@@ -470,7 +495,7 @@ mod zerometry_test {
             ]));
         let mut buf = Vec::new();
         Zerometry::write_from_geometry(&mut buf, &multi_line_string).unwrap();
-        let zulti_line_string = Zerometry::from_bytes(&buf).unwrap();
+        let zulti_line_string = unsafe { Zerometry::from_bytes(&buf).unwrap() };
         assert_eq!(zulti_line_string, multi_line_string);
     }
 
@@ -482,7 +507,7 @@ mod zerometry_test {
         ));
         let mut buf = Vec::new();
         Zerometry::write_from_geometry(&mut buf, &polygon).unwrap();
-        let zolygon = Zerometry::from_bytes(&buf).unwrap();
+        let zolygon = unsafe { Zerometry::from_bytes(&buf).unwrap() };
         assert_eq!(zolygon, polygon);
 
         let polygon = geometry::Geometry::Polygon(geometry::Polygon::new(
@@ -495,7 +520,7 @@ mod zerometry_test {
         ));
         let mut buf = Vec::new();
         Zerometry::write_from_geometry(&mut buf, &polygon).unwrap();
-        let zolygon = Zerometry::from_bytes(&buf).unwrap();
+        let zolygon = unsafe { Zerometry::from_bytes(&buf).unwrap() };
         assert_eq!(zolygon, polygon);
     }
 
@@ -504,7 +529,7 @@ mod zerometry_test {
         let multi_polygon = geometry::Geometry::MultiPolygon(geometry::MultiPolygon::new(vec![]));
         let mut buf = Vec::new();
         Zerometry::write_from_geometry(&mut buf, &multi_polygon).unwrap();
-        let zulti_polygon = Zerometry::from_bytes(&buf).unwrap();
+        let zulti_polygon = unsafe { Zerometry::from_bytes(&buf).unwrap() };
         assert_eq!(zulti_polygon, multi_polygon);
 
         let multi_polygon = geometry::Geometry::MultiPolygon(geometry::MultiPolygon::new(vec![
@@ -527,7 +552,7 @@ mod zerometry_test {
         ]));
         let mut buf = Vec::new();
         Zerometry::write_from_geometry(&mut buf, &multi_polygon).unwrap();
-        let zulti_polygon = Zerometry::from_bytes(&buf).unwrap();
+        let zulti_polygon = unsafe { Zerometry::from_bytes(&buf).unwrap() };
         assert_eq!(zulti_polygon, multi_polygon);
     }
 

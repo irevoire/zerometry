@@ -23,9 +23,11 @@ impl<'a> ZultiPoints<'a> {
         }
     }
 
-    pub fn from_bytes(data: &'a [u8]) -> Self {
-        let bounding_box = BoundingBox::from_bytes(&data[0..COORD_SIZE_IN_BYTES * 2]);
-        let coords = Coords::from_bytes(&data[COORD_SIZE_IN_BYTES * 2..]);
+    /// # Safety
+    /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
+    pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
+        let bounding_box = unsafe { BoundingBox::from_bytes(&data[0..COORD_SIZE_IN_BYTES * 2]) };
+        let coords = unsafe { Coords::from_bytes(&data[COORD_SIZE_IN_BYTES * 2..]) };
         Self::new(bounding_box, coords)
     }
 
@@ -166,7 +168,7 @@ mod tests {
         .unwrap();
         let input: &[f64] = cast_slice(&buffer);
         assert_compact_debug_snapshot!(input, @"[1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 4.0]");
-        let zulti_points = ZultiPoints::from_bytes(&buffer);
+        let zulti_points = unsafe { ZultiPoints::from_bytes(&buffer) };
         assert_compact_debug_snapshot!(zulti_points.bounding_box(), @"BoundingBox { bottom_left: Coord { x: 1.0, y: 2.0 }, top_right: Coord { x: 3.0, y: 4.0 } }");
         assert_compact_debug_snapshot!(zulti_points.coords(), @"[Coord { x: 1.0, y: 2.0 }, Coord { x: 3.0, y: 4.0 }]");
     }
@@ -178,7 +180,7 @@ mod tests {
             let multi_point = MultiPoint::from(points);
             let mut buffer = Vec::new();
             ZultiPoints::write_from_geometry(&mut buffer, &multi_point).unwrap();
-            let zulti_points = ZultiPoints::from_bytes(&buffer);
+            let zulti_points = unsafe { ZultiPoints::from_bytes(&buffer) };
             assert_eq!(zulti_points, multi_point);
         }
     }

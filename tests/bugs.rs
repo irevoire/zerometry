@@ -62,8 +62,8 @@ fn bug_breo_et_salagosse() {
     let breau = geojson::GeoJson::from_str(BREAU_ET_SALAGOSSE).unwrap();
     Zerometry::write_from_geometry(&mut buffer, &breau.try_into().unwrap()).unwrap();
     let second = buffer.len();
-    let query = Zolygon::from_bytes(&buffer[..first]);
-    let breau = Zerometry::from_bytes(&buffer[first..second]).unwrap();
+    let query = unsafe { Zolygon::from_bytes(&buffer[..first]) };
+    let breau = unsafe { Zerometry::from_bytes(&buffer[first..second]).unwrap() };
 
     let query_bb = query.bounding_box();
     let breau_bb = breau.to_polygon().unwrap().bounding_box();
