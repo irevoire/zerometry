@@ -9,6 +9,7 @@ use crate::{
     zine::Zine,
 };
 
+/// Equivalent of a [`geo_types::MultiPolygon`].
 #[derive(Clone, Copy)]
 pub struct ZultiPolygons<'a> {
     bounding_box: &'a BoundingBox,

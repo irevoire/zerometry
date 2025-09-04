@@ -7,9 +7,14 @@ use crate::{
     Zolygon, ZultiLines, ZultiPoints, ZultiPolygons, bounding_box::BOUNDING_BOX_SIZE_IN_BYTES,
 };
 
-/// This type is used to merge both the feature collection and the geometry collection.
-// Since we don't care to return how was structured the initial structure we can just
-// flatten everything to be a list of points, a list of lines and a list of polygons.
+/// Equivalent of a [`geo_types::GeometryCollection`] except it only contains:
+/// - One multi points
+/// - One multi lines
+/// - One multi polygon
+///
+/// Everything else gets pushed in one of these three types.
+/// If the collection contains other collection they all get flatenned to fit in these
+/// three types.
 #[derive(Debug, Clone, Copy)]
 pub struct Zollection<'a> {
     bounding_box: &'a BoundingBox,

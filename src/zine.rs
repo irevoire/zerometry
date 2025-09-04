@@ -9,6 +9,7 @@ use crate::{
     zulti_lines::ZultiLines,
 };
 
+/// Equivalent of a [`geo_types::LineString`].
 #[derive(Clone, Copy)]
 pub struct Zine<'a> {
     bounding_box: &'a BoundingBox,

@@ -31,6 +31,7 @@ pub use zulti_lines::ZultiLines;
 pub use zulti_points::ZultiPoints;
 pub use zulti_polygons::ZultiPolygons;
 
+/// Main structure of this crate, this is the equivalent of a [`geo_types::Geometry`] but serialized.
 #[derive(Debug, Clone, Copy)]
 pub enum Zerometry<'a> {
     Point(Zoint<'a>),
@@ -43,6 +44,8 @@ pub enum Zerometry<'a> {
 }
 
 impl<'a> Zerometry<'a> {
+    /// Create a `Zerometry` from a slice of bytes.
+    /// See [`Self::write_from_geometry`] to create the slice of bytes.
     pub fn from_bytes(data: &'a [u8]) -> Result<Self, std::io::Error> {
         let tag = u64::from_ne_bytes(data[..mem::size_of::<u64>()].try_into().unwrap());
         let data = &data[mem::size_of::<u64>()..];
@@ -62,7 +65,10 @@ impl<'a> Zerometry<'a> {
         }
     }
 
-    /// The Line, Triangle and Rectangle gets converted respectively to Zine and Zolygon
+    /// Convert the specified [`geo_types::Geometry`] to a valid [`Zerometry`] slice of bytes in the input buffer.
+    /// This is a destructive operation, the original geometry cannot be recreated as-is from the outputted zerometry:
+    /// - The Line, Triangle and Rectangle gets converted respectively to Zine and Zolygon
+    /// - The collections are flattened to a collection containing one multipoints, one multipolygons and one multilines.
     pub fn write_from_geometry(
         writer: &mut Vec<u8>,
         geometry: &Geometry<f64>,

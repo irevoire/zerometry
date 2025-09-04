@@ -8,6 +8,7 @@ use crate::{
     ZultiPoints, ZultiPolygons, zine::Zine, zulti_lines::ZultiLines,
 };
 
+/// Equivalent of a [`geo_types::Point`].
 #[derive(Clone, Copy)]
 pub struct Zoint<'a> {
     coord: &'a Coord,

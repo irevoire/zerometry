@@ -8,6 +8,7 @@ use crate::{
     Zerometry, Zoint, Zollection, Zolygon, ZultiPolygons, zine::Zine, zulti_lines::ZultiLines,
 };
 
+/// Equivalent of a [`geo_types::MultiPoint`].
 #[derive(Clone, Copy)]
 pub struct ZultiPoints<'a> {
     bounding_box: &'a BoundingBox,

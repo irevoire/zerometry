@@ -10,6 +10,7 @@ use crate::{
     ZultiPoints, ZultiPolygons, zine::Zine,
 };
 
+/// Equivalent of a [`geo_types::Polygon`].
 /// A polygon is a closed shape defined by a list of coordinates.
 ///
 /// The polygon is represented by a bounding box and a list of coordinates.

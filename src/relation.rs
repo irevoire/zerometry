@@ -29,6 +29,7 @@ pub struct InputRelation {
 }
 
 impl InputRelation {
+    /// Set everything to `true` and cannot early exit.
     pub fn all() -> Self {
         Self {
             contains: true,
@@ -41,6 +42,7 @@ impl InputRelation {
         }
     }
 
+    /// Set everything to `true` but can early exit.
     pub fn any() -> Self {
         Self {
             contains: true,
@@ -53,35 +55,42 @@ impl InputRelation {
         }
     }
 
+    /// Swap the contains and contained relation.
     pub fn swap_contains_relation(mut self) -> Self {
         std::mem::swap(&mut self.contains, &mut self.contained);
         std::mem::swap(&mut self.strict_contains, &mut self.strict_contained);
         self
     }
 
+    /// Set everything to false, same as [`Self::default`].
     pub fn none() -> Self {
         Self::default()
     }
 
+    /// Generates an [`OutputRelation`] where every `true` field of `Self` are set to `Some(false)`.
     pub fn to_false(self) -> OutputRelation {
         OutputRelation::false_from_input(self)
     }
 
+    /// Generates an [`OutputRelation`] where every `true` field of `Self` are set to `Some(true)`.
     pub fn to_true(self) -> OutputRelation {
         OutputRelation::true_from_input(self)
     }
 
+    /// Remove the strict contains and contained.
     pub fn strip_strict(mut self) -> Self {
         self.strict_contains = false;
         self.strict_contained = false;
         self
     }
 
+    /// Remove only the strict contained.
     pub fn strip_strict_contained(mut self) -> Self {
         self.strict_contained = false;
         self
     }
 
+    /// Remove disjoint.
     pub fn strip_disjoint(mut self) -> Self {
         self.disjoint = false;
         self
@@ -89,11 +98,14 @@ impl InputRelation {
 }
 
 /// Returned by the `relation` function.
-/// All fields are made of a Option<bool>.
+/// All fields are made of a `Option<bool>`.
 /// There are two cases for which a field can be None:
 /// - If you didn't ask for it when filling the `InputRelation` struct
 /// - If the relation algorithm didn't evaluate this relation because the
 ///   `early_exit` flag was set.
+///
+/// Note that when early exit is set, most fields will be set to `Some(false)` even
+/// though they were not evaluated at all.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct OutputRelation {
     pub contains: Option<bool>,
@@ -209,6 +221,7 @@ impl OutputRelation {
         }
     }
 
+    /// Return true if the output contains anything except disjoint.
     pub fn any_relation(&self) -> bool {
         // If the shape are distinct we don't need to check anything else and can stop early
         (!self.disjoint.unwrap_or_default())
@@ -220,6 +233,7 @@ impl OutputRelation {
                 || self.intersect.unwrap_or_default())
     }
 
+    /// Swap the contains and contained relation.
     pub fn swap_contains_relation(mut self) -> Self {
         std::mem::swap(&mut self.contains, &mut self.contained);
         std::mem::swap(&mut self.strict_contains, &mut self.strict_contained);

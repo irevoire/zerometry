@@ -9,6 +9,7 @@ use crate::{
     zine::Zine,
 };
 
+/// Equivalent of a [`geo_types::MultiLineString`].
 #[derive(Clone, Copy)]
 pub struct ZultiLines<'a> {
     bounding_box: &'a BoundingBox,
