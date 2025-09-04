@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 mod bounding_box;
 mod coord;
 mod coords;
