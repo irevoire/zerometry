@@ -26,6 +26,7 @@ impl<'a> Zine<'a> {
 
     /// # Safety
     /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
+    #[inline]
     pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
         let bounding_box = unsafe { BoundingBox::from_bytes(&data[0..COORD_SIZE_IN_BYTES * 2]) };
         let coords = unsafe { Coords::from_bytes(&data[COORD_SIZE_IN_BYTES * 2..]) };
@@ -47,22 +48,27 @@ impl<'a> Zine<'a> {
         Ok(())
     }
 
+    #[inline]
     pub fn bounding_box(&self) -> &'a BoundingBox {
         self.bounding_box
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.coords.len()
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    #[inline]
     pub fn coords(&self) -> &'a Coords {
         self.coords
     }
 
+    #[inline]
     pub fn segments(&self) -> impl Iterator<Item = Segment<'a>> {
         self.coords.consecutive_pairs().map(Segment::from_slice)
     }

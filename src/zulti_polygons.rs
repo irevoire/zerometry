@@ -31,6 +31,7 @@ impl<'a> ZultiPolygons<'a> {
 
     /// # Safety
     /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
+    #[inline]
     pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
         // 1. Retrieve the bounding box
         let bounding_box = unsafe { BoundingBox::from_bytes(&data[..BOUNDING_BOX_SIZE_IN_BYTES]) };
@@ -100,10 +101,12 @@ impl<'a> ZultiPolygons<'a> {
         Ok(())
     }
 
+    #[inline]
     pub fn bounding_box(&self) -> &'a BoundingBox {
         self.bounding_box
     }
 
+    #[inline]
     pub fn get(&self, index: usize) -> Option<Zolygon<'a>> {
         let offset = *self.offsets.get(index)?;
         let next_offset = *self
@@ -114,14 +117,17 @@ impl<'a> ZultiPolygons<'a> {
         Some(unsafe { Zolygon::from_bytes(bytes) })
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.offsets.len()
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    #[inline]
     pub fn polygons(&'a self) -> impl Iterator<Item = Zolygon<'a>> {
         (0..self.len()).map(move |index| self.get(index).unwrap())
     }

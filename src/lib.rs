@@ -51,6 +51,7 @@ impl<'a> Zerometry<'a> {
     ///
     /// # Safety
     /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
+    #[inline]
     pub unsafe fn from_bytes(data: &'a [u8]) -> Result<Self, std::io::Error> {
         if data.len() < mem::size_of::<u64>() {
             return Err(io::Error::new(
@@ -145,6 +146,7 @@ impl<'a> Zerometry<'a> {
         Ok(())
     }
 
+    #[inline]
     pub fn to_point(&self) -> Option<Zoint> {
         match self {
             Zerometry::Point(a) => Some(*a),
@@ -152,6 +154,7 @@ impl<'a> Zerometry<'a> {
         }
     }
 
+    #[inline]
     pub fn to_multi_points(&self) -> Option<ZultiPoints> {
         match self {
             Zerometry::MultiPoints(a) => Some(*a),
@@ -159,6 +162,7 @@ impl<'a> Zerometry<'a> {
         }
     }
 
+    #[inline]
     pub fn to_line(&self) -> Option<Zine> {
         match self {
             Zerometry::Line(a) => Some(*a),
@@ -166,6 +170,7 @@ impl<'a> Zerometry<'a> {
         }
     }
 
+    #[inline]
     pub fn to_zulti_lines(&self) -> Option<ZultiLines> {
         match self {
             Zerometry::MultiLines(a) => Some(*a),
@@ -173,6 +178,7 @@ impl<'a> Zerometry<'a> {
         }
     }
 
+    #[inline]
     pub fn to_polygon(&self) -> Option<Zolygon> {
         match self {
             Zerometry::Polygon(a) => Some(*a),
@@ -180,6 +186,7 @@ impl<'a> Zerometry<'a> {
         }
     }
 
+    #[inline]
     pub fn to_multi_polygon(&self) -> Option<ZultiPolygons> {
         match self {
             Zerometry::MultiPolygon(a) => Some(*a),
@@ -201,24 +208,28 @@ impl<'a> Zerometry<'a> {
 }
 
 impl<'a> From<Zoint<'a>> for Zerometry<'a> {
+    #[inline]
     fn from(point: Zoint<'a>) -> Self {
         Zerometry::Point(point)
     }
 }
 
 impl<'a> From<ZultiPoints<'a>> for Zerometry<'a> {
+    #[inline]
     fn from(points: ZultiPoints<'a>) -> Self {
         Zerometry::MultiPoints(points)
     }
 }
 
 impl<'a> From<Zolygon<'a>> for Zerometry<'a> {
+    #[inline]
     fn from(polygon: Zolygon<'a>) -> Self {
         Zerometry::Polygon(polygon)
     }
 }
 
 impl<'a> From<ZultiPolygons<'a>> for Zerometry<'a> {
+    #[inline]
     fn from(polygon: ZultiPolygons<'a>) -> Self {
         Zerometry::MultiPolygon(polygon)
     }

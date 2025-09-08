@@ -31,6 +31,7 @@ impl<'a> ZultiLines<'a> {
 
     /// # Safety
     /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
+    #[inline]
     pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
         // 1. Retrieve the bounding box
         let bounding_box = unsafe { BoundingBox::from_bytes(&data[..BOUNDING_BOX_SIZE_IN_BYTES]) };
@@ -101,10 +102,12 @@ impl<'a> ZultiLines<'a> {
         Ok(())
     }
 
+    #[inline]
     pub fn bounding_box(&self) -> &'a BoundingBox {
         self.bounding_box
     }
 
+    #[inline]
     pub fn get(&self, index: usize) -> Option<Zine<'a>> {
         let offset = *self.offsets.get(index)?;
         let next_offset = *self
@@ -115,14 +118,17 @@ impl<'a> ZultiLines<'a> {
         Some(unsafe { Zine::from_bytes(bytes) })
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.offsets.len()
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    #[inline]
     pub fn lines(&'a self) -> impl Iterator<Item = Zine<'a>> {
         (0..self.len()).map(move |index| self.get(index).unwrap())
     }

@@ -49,6 +49,7 @@ impl<'a> Zollection<'a> {
 
     /// # Safety
     /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
+    #[inline]
     pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
         // 1. Retrieve the bounding box
         let bounding_box = unsafe { BoundingBox::from_bytes(&data[..BOUNDING_BOX_SIZE_IN_BYTES]) };
@@ -131,26 +132,32 @@ impl<'a> Zollection<'a> {
         Ok(())
     }
 
+    #[inline]
     pub fn bounding_box(&self) -> &'a BoundingBox {
         self.bounding_box
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.points.len() + self.lines.len() + self.polygons.len()
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    #[inline]
     pub fn points(&'a self) -> ZultiPoints<'a> {
         self.points
     }
 
+    #[inline]
     pub fn lines(&'a self) -> ZultiLines<'a> {
         self.lines
     }
 
+    #[inline]
     pub fn polygons(&'a self) -> ZultiPolygons<'a> {
         self.polygons
     }

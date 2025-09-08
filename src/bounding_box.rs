@@ -28,18 +28,22 @@ pub struct BoundingBox {
 impl BoundingBox {
     /// # Safety
     /// The data must contains exactly 4 f64 and be aligned on 64 bits.
+    #[inline]
     pub unsafe fn from_bytes(data: &[u8]) -> &Self {
         Self::from_coords(unsafe { Coords::from_bytes(data) })
     }
 
+    #[inline]
     pub fn from_slice(data: &[f64]) -> &Self {
         Self::from_coords(Coords::from_slice(data))
     }
 
+    #[inline]
     pub fn from_slice_mut(data: &mut [f64]) -> &mut Self {
         Self::from_coords_mut(Coords::from_slice_mut(data))
     }
 
+    #[inline]
     pub fn from_coords(coords: &Coords) -> &Self {
         debug_assert_eq!(
             coords.len(),
@@ -58,6 +62,7 @@ impl BoundingBox {
         unsafe { mem::transmute(coords) }
     }
 
+    #[inline]
     pub fn from_coords_mut(coords: &mut Coords) -> &mut Self {
         debug_assert_eq!(
             coords.len(),
@@ -112,43 +117,54 @@ impl BoundingBox {
         Ok(())
     }
 
+    #[inline]
     pub fn coords(&self) -> &Coords {
         &self.coords
     }
 
+    #[inline]
     pub fn bottom_left(&self) -> &Coord {
         &self.coords[0]
     }
 
+    #[inline]
     pub fn top_right(&self) -> &Coord {
         &self.coords[1]
     }
 
+    #[inline]
     pub fn bottom(&self) -> f64 {
         self.bottom_left().lat()
     }
+    #[inline]
     pub fn top(&self) -> f64 {
         self.top_right().lat()
     }
+    #[inline]
     pub fn left(&self) -> f64 {
         self.bottom_left().lng()
     }
+    #[inline]
     pub fn right(&self) -> f64 {
         self.top_right().lng()
     }
 
+    #[inline]
     pub fn horizontal_range(&self) -> RangeInclusive<f64> {
         self.left()..=self.right()
     }
+    #[inline]
     pub fn vertical_range(&self) -> RangeInclusive<f64> {
         self.bottom()..=self.top()
     }
 
+    #[inline]
     pub fn contains_coord(&self, coord: &Coord) -> bool {
         self.vertical_range().contains(&coord.lat())
             && self.horizontal_range().contains(&coord.lng())
     }
 
+    #[inline]
     pub fn to_geo(&self) -> geo_types::Rect<f64> {
         geo_types::Rect::new(self.bottom_left().to_geo(), self.top_right().to_geo())
     }
@@ -164,6 +180,7 @@ impl fmt::Debug for BoundingBox {
 }
 
 impl RelationBetweenShapes<Coord> for BoundingBox {
+    #[inline]
     fn relation(&self, other: &Coord, relation: InputRelation) -> OutputRelation {
         if self.contains_coord(other) {
             relation.to_false().make_strict_contains_if_set()
@@ -174,6 +191,7 @@ impl RelationBetweenShapes<Coord> for BoundingBox {
 }
 
 impl RelationBetweenShapes<BoundingBox> for BoundingBox {
+    #[inline]
     fn relation(&self, other: &BoundingBox, relation: InputRelation) -> OutputRelation {
         let relation = relation.to_false();
 

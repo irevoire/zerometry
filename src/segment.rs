@@ -17,14 +17,17 @@ pub struct Segment<'a> {
 impl<'a> Segment<'a> {
     /// # Safety
     /// The data must be aligned on 64bit and contains exactly 4 f64.
+    #[inline]
     pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
         Self::from_coords(unsafe { Coords::from_bytes(data) })
     }
 
+    #[inline]
     pub fn from_slice(data: &'a [f64]) -> Self {
         Self::from_coords(Coords::from_slice(data))
     }
 
+    #[inline]
     pub fn from_coords(coords: &'a Coords) -> Self {
         debug_assert_eq!(coords.len(), 2, "Segment must have 2 coordinates");
         Self {
@@ -33,19 +36,23 @@ impl<'a> Segment<'a> {
         }
     }
 
+    #[inline]
     pub fn from_coord_pair(start: &'a Coord, end: &'a Coord) -> Self {
         Self { start, end }
     }
 
+    #[inline]
     pub fn start(&self) -> &'a Coord {
         self.start
     }
 
+    #[inline]
     pub fn end(&self) -> &'a Coord {
         self.end
     }
 
     /// Returns true if the segment intersects with the other segment.
+    #[inline]
     pub fn intersects(&self, other: &Segment) -> bool {
         geo::intersects::Intersects::intersects(
             &geo_types::Line::new(self.start.to_geo(), self.end.to_geo()),

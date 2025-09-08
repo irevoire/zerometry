@@ -21,6 +21,7 @@ impl<'a> Zoint<'a> {
 
     /// # Safety
     /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
+    #[inline]
     pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
         let coord = unsafe { Coord::from_bytes(data) };
         Self::new(coord)
@@ -35,24 +36,30 @@ impl<'a> Zoint<'a> {
         Ok(())
     }
 
+    #[inline]
     pub fn coord(&self) -> &'a Coord {
         self.coord
     }
 
+    #[inline]
     pub fn lat(&self) -> f64 {
         self.coord.lat()
     }
+    #[inline]
     pub fn lng(&self) -> f64 {
         self.coord.lng()
     }
 
+    #[inline]
     pub fn x(&self) -> f64 {
         self.coord.lng()
     }
+    #[inline]
     pub fn y(&self) -> f64 {
         self.coord.lat()
     }
 
+    #[inline]
     pub fn to_geo(&self) -> geo_types::Point<f64> {
         geo_types::Point::new(self.coord.lng(), self.coord.lat())
     }

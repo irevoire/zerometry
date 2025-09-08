@@ -34,6 +34,7 @@ impl<'a> Zolygon<'a> {
 
     /// # Safety
     /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
+    #[inline]
     pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
         debug_assert!(
             data.len() % COORD_SIZE_IN_FLOATS == 0,
@@ -66,18 +67,22 @@ impl<'a> Zolygon<'a> {
         Ok(())
     }
 
+    #[inline]
     pub fn bounding_box(&self) -> &'a BoundingBox {
         self.bounding_box
     }
 
+    #[inline]
     pub fn coords(&self) -> &'a Coords {
         self.coords
     }
 
+    #[inline]
     pub fn segments(&self) -> impl Iterator<Item = Segment<'a>> {
         self.coords.consecutive_pairs().map(Segment::from_slice)
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.coords.len() == 0
     }
