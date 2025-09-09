@@ -69,6 +69,23 @@ impl<'a> ZultiPoints<'a> {
         self.coords
     }
 
+    /// Return a zoint by index, if the index doesn't exists, returns None
+    #[inline]
+    pub fn get(&self, index: usize) -> Option<Zoint<'a>> {
+        if index > self.coords.len() {
+            None
+        } else {
+            let coord = &self.coords()[index];
+            Some(Zoint::new(coord))
+        }
+    }
+
+    /// Returns the individual [`Zoint`]s that compose the [`ZultiPoints`]
+    #[inline]
+    pub fn points(&'a self) -> impl Iterator<Item = Zoint<'a>> {
+        (0..self.len()).map(move |index| self.get(index).unwrap())
+    }
+
     /// Convert the [`ZultiPoints`] back to a [`geo_types::MultiPoint`].
     pub fn to_geo(&self) -> geo_types::MultiPoint<f64> {
         geo_types::MultiPoint::new(
