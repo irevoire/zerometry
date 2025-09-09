@@ -19,16 +19,20 @@ impl<'a> Segment<'a> {
     /// The data must be aligned on 64bit and contains exactly 4 f64.
     #[inline]
     pub unsafe fn from_bytes(data: &'a [u8]) -> Self {
-        Self::from_coords(unsafe { Coords::from_bytes(data) })
+        unsafe { Self::from_coords(Coords::from_bytes(data)) }
     }
 
+    /// # Safety
+    /// The data must contain exactly 4 f64.
     #[inline]
-    pub fn from_slice(data: &'a [f64]) -> Self {
-        Self::from_coords(Coords::from_slice(data))
+    pub unsafe fn from_slice(data: &'a [f64]) -> Self {
+        unsafe { Self::from_coords(Coords::from_slice(data)) }
     }
 
+    /// # Safety
+    /// The data must contain exactly 2 coords.
     #[inline]
-    pub fn from_coords(coords: &'a Coords) -> Self {
+    pub unsafe fn from_coords(coords: &'a Coords) -> Self {
         debug_assert_eq!(coords.len(), 2, "Segment must have 2 coordinates");
         Self {
             start: &coords[0],
@@ -36,16 +40,19 @@ impl<'a> Segment<'a> {
         }
     }
 
+    /// Create a segment from two coords.
     #[inline]
     pub fn from_coord_pair(start: &'a Coord, end: &'a Coord) -> Self {
         Self { start, end }
     }
 
+    /// Return the coord of the start of the segment.
     #[inline]
     pub fn start(&self) -> &'a Coord {
         self.start
     }
 
+    /// Return the coord of the end of the segment.
     #[inline]
     pub fn end(&self) -> &'a Coord {
         self.end
@@ -125,7 +132,7 @@ mod tests {
     #[test]
     fn test_segment_from_slice() {
         let data = [1.0, 2.0, 3.0, 4.0];
-        let bb = Segment::from_slice(&data);
+        let bb = unsafe { Segment::from_slice(&data) };
         insta::assert_debug_snapshot!(bb, @r"
         Segment {
             start: Coord {
@@ -144,46 +151,46 @@ mod tests {
     #[should_panic]
     fn test_segment_from_slice_panic_on_missing_point_slice() {
         let data = [1.0, 2.0];
-        Segment::from_slice(&data);
+        unsafe { Segment::from_slice(&data) };
     }
 
     #[test]
     #[should_panic]
     fn test_segment_from_slice_panic_on_too_many_point_slice() {
         let data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
-        Segment::from_slice(&data);
+        unsafe { Segment::from_slice(&data) };
     }
 
     #[test]
     fn test_segment_intersects() {
-        let segment1 = Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]);
-        let segment2 = Segment::from_slice(&[1.0, 0.0, 0.0, 1.0]);
+        let segment1 = unsafe { Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]) };
+        let segment2 = unsafe { Segment::from_slice(&[1.0, 0.0, 0.0, 1.0]) };
         assert!(segment1.intersects(&segment2));
-        let segment1 = Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]);
-        let segment2 = Segment::from_slice(&[0.0, 1.0, 1.0, 0.0]);
+        let segment1 = unsafe { Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]) };
+        let segment2 = unsafe { Segment::from_slice(&[0.0, 1.0, 1.0, 0.0]) };
         assert!(segment1.intersects(&segment2));
     }
 
     #[test]
     fn test_segment_intersects_parallel() {
-        let segment1 = Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]);
-        let segment2 = Segment::from_slice(&[0.0, 1.0, 1.0, 2.0]);
+        let segment1 = unsafe { Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]) };
+        let segment2 = unsafe { Segment::from_slice(&[0.0, 1.0, 1.0, 2.0]) };
         assert!(!segment1.intersects(&segment2));
-        let segment1 = Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]);
-        let segment2 = Segment::from_slice(&[1.0, 0.0, 2.0, 1.0]);
+        let segment1 = unsafe { Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]) };
+        let segment2 = unsafe { Segment::from_slice(&[1.0, 0.0, 2.0, 1.0]) };
         assert!(!segment1.intersects(&segment2));
     }
 
     #[test]
     fn test_segment_overlaps() {
-        let segment1 = Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]);
-        let segment2 = Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]);
+        let segment1 = unsafe { Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]) };
+        let segment2 = unsafe { Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]) };
         assert!(segment1.intersects(&segment2));
-        let segment1 = Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]);
-        let segment2 = Segment::from_slice(&[0.5, 0.5, 1.5, 1.5]);
+        let segment1 = unsafe { Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]) };
+        let segment2 = unsafe { Segment::from_slice(&[0.5, 0.5, 1.5, 1.5]) };
         assert!(segment1.intersects(&segment2));
-        let segment1 = Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]);
-        let segment2 = Segment::from_slice(&[0.5, 0.5, -1.0, -1.0]);
+        let segment1 = unsafe { Segment::from_slice(&[0.0, 0.0, 1.0, 1.0]) };
+        let segment2 = unsafe { Segment::from_slice(&[0.5, 0.5, -1.0, -1.0]) };
         assert!(segment1.intersects(&segment2));
     }
 
@@ -191,18 +198,22 @@ mod tests {
     fn bug_missing_intersection() {
         // ray: Segment { start: Coord { x: -6.436337296790293, y: 49.63676497357687 }, end: Coord { x: 6.0197316417968105, y: 49.63676497357687 } }
         // segment: Segment { start: Coord { x: 1.188509553443464, y: 49.47027919866874 }, end: Coord { x: 3.6300086390995316, y: 50.610463312569514 } }
-        let ray = Segment::from_slice(&[
-            -6.436337296790293,
-            49.63676497357687,
-            6.0197316417968105,
-            49.63676497357687,
-        ]);
-        let segment = Segment::from_slice(&[
-            1.188509553443464,
-            49.47027919866874,
-            3.6300086390995316,
-            50.610463312569514,
-        ]);
+        let ray = unsafe {
+            Segment::from_slice(&[
+                -6.436337296790293,
+                49.63676497357687,
+                6.0197316417968105,
+                49.63676497357687,
+            ])
+        };
+        let segment = unsafe {
+            Segment::from_slice(&[
+                1.188509553443464,
+                49.47027919866874,
+                3.6300086390995316,
+                50.610463312569514,
+            ])
+        };
         assert!(segment.intersects(&ray));
     }
 }

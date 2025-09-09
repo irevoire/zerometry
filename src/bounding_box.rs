@@ -27,24 +27,35 @@ pub struct BoundingBox {
 
 impl BoundingBox {
     /// # Safety
-    /// The data must contains exactly 4 f64 and be aligned on 64 bits.
+    /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
     #[inline]
     pub unsafe fn from_bytes(data: &[u8]) -> &Self {
-        Self::from_coords(unsafe { Coords::from_bytes(data) })
+        unsafe { Self::from_coords(Coords::from_bytes(data)) }
     }
 
+    /// Create the bounding box from a slice of `f64`
+    ///
+    /// # Safety
+    /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
     #[inline]
-    pub fn from_slice(data: &[f64]) -> &Self {
-        Self::from_coords(Coords::from_slice(data))
+    pub unsafe fn from_slice(data: &[f64]) -> &Self {
+        unsafe { Self::from_coords(Coords::from_slice(data)) }
     }
 
+    /// # Safety
+    /// The data must be generated from the [`Self::write_from_geometry`] method and be aligned on 64 bits
     #[inline]
-    pub fn from_slice_mut(data: &mut [f64]) -> &mut Self {
-        Self::from_coords_mut(Coords::from_slice_mut(data))
+    pub unsafe fn from_slice_mut(data: &mut [f64]) -> &mut Self {
+        unsafe { Self::from_coords_mut(Coords::from_slice_mut(data)) }
     }
 
+    /// # Safety
+    /// The Coords must:
+    /// - Contains at least two elements
+    /// - Be aligned on 64 bits
+    /// - Have it's first coordinate smaller than the second one
     #[inline]
-    pub fn from_coords(coords: &Coords) -> &Self {
+    pub unsafe fn from_coords(coords: &Coords) -> &Self {
         debug_assert_eq!(
             coords.len(),
             2,
@@ -62,8 +73,13 @@ impl BoundingBox {
         unsafe { mem::transmute(coords) }
     }
 
+    /// # Safety
+    /// The Coords must:
+    /// - Contains at least two elements
+    /// - Be aligned on 64 bits
+    /// - Have it's first coordinate smaller than the second one
     #[inline]
-    pub fn from_coords_mut(coords: &mut Coords) -> &mut Self {
+    pub unsafe fn from_coords_mut(coords: &mut Coords) -> &mut Self {
         debug_assert_eq!(
             coords.len(),
             2,
@@ -81,6 +97,7 @@ impl BoundingBox {
         unsafe { mem::transmute(coords) }
     }
 
+    /// Write the bounding boxe that contains all the specified points to a buffer.
     pub fn write_from_geometry(
         writer: &mut impl Write,
         mut points: impl Iterator<Item = Point<f64>>,
@@ -117,53 +134,65 @@ impl BoundingBox {
         Ok(())
     }
 
+    /// Return the internal coords
     #[inline]
     pub fn coords(&self) -> &Coords {
         &self.coords
     }
 
+    /// Return the bottom left coord
     #[inline]
     pub fn bottom_left(&self) -> &Coord {
         &self.coords[0]
     }
 
+    /// Return the top right coord
     #[inline]
     pub fn top_right(&self) -> &Coord {
         &self.coords[1]
     }
 
+    /// Return the bottom latitude
     #[inline]
     pub fn bottom(&self) -> f64 {
         self.bottom_left().lat()
     }
+    /// Return the top latitude
     #[inline]
     pub fn top(&self) -> f64 {
         self.top_right().lat()
     }
+    /// Return the left longitude
     #[inline]
     pub fn left(&self) -> f64 {
         self.bottom_left().lng()
     }
+    /// Return the right longitude
     #[inline]
     pub fn right(&self) -> f64 {
         self.top_right().lng()
     }
 
+    /// Return the longitude range contained in the bounding box
     #[inline]
     pub fn horizontal_range(&self) -> RangeInclusive<f64> {
         self.left()..=self.right()
     }
+    /// Return the latitude range contained in the bounding box
     #[inline]
     pub fn vertical_range(&self) -> RangeInclusive<f64> {
         self.bottom()..=self.top()
     }
 
+    /// Return `true` if the coord is contained in the bounding box
     #[inline]
     pub fn contains_coord(&self, coord: &Coord) -> bool {
         self.vertical_range().contains(&coord.lat())
             && self.horizontal_range().contains(&coord.lng())
     }
 
+    /// Convert the bounding box to a [`geo_types::Rect`].
+    /// Note: Converting that back to a [`crate::Zerometry`] will produce a [`crate::Zolygon`]
     #[inline]
     pub fn to_geo(&self) -> geo_types::Rect<f64> {
         geo_types::Rect::new(self.bottom_left().to_geo(), self.top_right().to_geo())
@@ -279,7 +308,7 @@ mod tests {
     #[test]
     fn test_bounding_box_from_slice() {
         let data = [1.0, 2.0, 3.0, 4.0];
-        let bb = BoundingBox::from_slice(&data);
+        let bb = unsafe { BoundingBox::from_slice(&data) };
         insta::assert_debug_snapshot!(bb, @r"
         BoundingBox {
             bottom_left: Coord {
@@ -298,48 +327,48 @@ mod tests {
     #[should_panic]
     fn test_bounding_box_from_slice_panic_on_missing_point_slice() {
         let data = [1.0, 2.0];
-        BoundingBox::from_slice(&data);
+        unsafe { BoundingBox::from_slice(&data) };
     }
 
     #[test]
     #[should_panic]
     fn test_bounding_box_from_slice_panic_on_too_many_point_slice() {
         let data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
-        BoundingBox::from_slice(&data);
+        unsafe { BoundingBox::from_slice(&data) };
     }
 
     #[test]
     #[should_panic]
     fn test_bounding_box_from_slice_panic_on_unordered_points() {
         let data = [1.0, 4.0, 3.0, 2.0];
-        BoundingBox::from_slice(&data);
+        unsafe { BoundingBox::from_slice(&data) };
     }
 
     #[test]
     fn test_bounding_box_contains_coord() {
-        let bb = BoundingBox::from_slice(&[1.0, 2.0, 3.0, 4.0]);
-        assert!(bb.contains_coord(Coord::from_slice(&[2.0, 3.0])));
-        assert!(!bb.contains_coord(Coord::from_slice(&[0.0, 0.0])));
+        let bb = unsafe { BoundingBox::from_slice(&[1.0, 2.0, 3.0, 4.0]) };
+        assert!(bb.contains_coord(unsafe { Coord::from_slice(&[2.0, 3.0]) }));
+        assert!(!bb.contains_coord(unsafe { Coord::from_slice(&[0.0, 0.0]) }));
     }
 
     #[test]
     fn test_bounding_box_relation_to_coord() {
-        let bb = BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0]);
-        assert!(bb.contains(Coord::from_slice(&[2.0, 3.0])));
-        assert!(bb.contains(Coord::from_slice(&[0.0, 0.0])));
-        assert!(bb.contains(Coord::from_slice(&[10.0, 10.0])));
-        assert!(bb.disjoint(Coord::from_slice(&[11.0, 11.0])));
-        assert!(bb.disjoint(Coord::from_slice(&[-1.0, -1.0])));
+        let bb = unsafe { BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0]) };
+        assert!(bb.contains(unsafe { Coord::from_slice(&[2.0, 3.0]) }));
+        assert!(bb.contains(unsafe { Coord::from_slice(&[0.0, 0.0]) }));
+        assert!(bb.contains(unsafe { Coord::from_slice(&[10.0, 10.0]) }));
+        assert!(bb.disjoint(unsafe { Coord::from_slice(&[11.0, 11.0]) }));
+        assert!(bb.disjoint(unsafe { Coord::from_slice(&[-1.0, -1.0]) }));
     }
 
     #[test]
     fn test_bounding_box_relation_to_bounding_box() {
-        let bb = BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0]);
-        assert!(bb.contains(BoundingBox::from_slice(&[1.0, 1.0, 3.0, 3.0])));
-        assert!(bb.intersects(BoundingBox::from_slice(&[-1.0, 0.0, 1.0, 2.0])));
-        assert!(bb.intersects(BoundingBox::from_slice(&[10.0, 0.0, 20.0, 10.0])));
-        assert!(bb.contains(BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0])));
-        assert!(bb.contained(BoundingBox::from_slice(&[-1.0, -1.0, 11.0, 11.0])));
-        assert!(bb.disjoint(BoundingBox::from_slice(&[11.0, 11.0, 12.0, 12.0])));
+        let bb = unsafe { BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0]) };
+        assert!(bb.contains(unsafe { BoundingBox::from_slice(&[1.0, 1.0, 3.0, 3.0]) }));
+        assert!(bb.intersects(unsafe { BoundingBox::from_slice(&[-1.0, 0.0, 1.0, 2.0]) }));
+        assert!(bb.intersects(unsafe { BoundingBox::from_slice(&[10.0, 0.0, 20.0, 10.0]) }));
+        assert!(bb.contains(unsafe { BoundingBox::from_slice(&[0.0, 0.0, 10.0, 10.0]) }));
+        assert!(bb.contained(unsafe { BoundingBox::from_slice(&[-1.0, -1.0, 11.0, 11.0]) }));
+        assert!(bb.disjoint(unsafe { BoundingBox::from_slice(&[11.0, 11.0, 12.0, 12.0]) }));
     }
 }

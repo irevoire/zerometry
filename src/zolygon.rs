@@ -25,6 +25,8 @@ pub struct Zolygon<'a> {
 }
 
 impl<'a> Zolygon<'a> {
+    /// Create a [`Zolygon`] from its bounding box and coords.
+    /// If the bounding box doesn't properly bound the polygon all the operation will breaks.
     pub fn new(bounding_box: &'a BoundingBox, coords: &'a Coords) -> Self {
         Self {
             bounding_box,
@@ -53,6 +55,8 @@ impl<'a> Zolygon<'a> {
         Self::new(bounding_box, coords)
     }
 
+    /// Convert the specified [`geo_types::Polygon`] to a valid [`Zolygon`] slice of bytes in the input buffer.
+    /// If the polygon contains an interior, the information will be lost and ignored during operations.
     pub fn write_from_geometry(
         writer: &mut impl Write,
         geometry: &Polygon<f64>,
@@ -67,26 +71,33 @@ impl<'a> Zolygon<'a> {
         Ok(())
     }
 
+    /// Return the internal bounding box
     #[inline]
     pub fn bounding_box(&self) -> &'a BoundingBox {
         self.bounding_box
     }
 
+    /// Return the internal coords
     #[inline]
     pub fn coords(&self) -> &'a Coords {
         self.coords
     }
 
+    /// Return the segments that composes the polygon
     #[inline]
     pub fn segments(&self) -> impl Iterator<Item = Segment<'a>> {
-        self.coords.consecutive_pairs().map(Segment::from_slice)
+        self.coords
+            .consecutive_pairs()
+            .map(|coords| unsafe { Segment::from_slice(coords) })
     }
 
+    /// Return `true` if the polygon doesn't contain any points
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.coords.len() == 0
     }
 
+    /// Convert the [`Zolygon`] back to a [`geo_types::Polygon`].
     pub fn to_geo(&self) -> geo_types::Polygon<f64> {
         geo_types::Polygon::new(
             self.coords
@@ -118,7 +129,7 @@ impl<'a> RelationBetweenShapes<Coord> for Zolygon<'a> {
         // the point is outside of the polygon, otherwise it's inside.
         let end = other;
         let mut buffer = [0.0; COORD_SIZE_IN_FLOATS];
-        let start = Coord::from_slice_mut(&mut buffer);
+        let start = unsafe { Coord::from_slice_mut(&mut buffer) };
         *start.lng_mut() = self.bounding_box.left();
         *start.lat_mut() = end.lat();
         let ray = Segment::from_coord_pair(start, end);

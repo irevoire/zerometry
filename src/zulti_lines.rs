@@ -21,6 +21,8 @@ pub struct ZultiLines<'a> {
 }
 
 impl<'a> ZultiLines<'a> {
+    /// Create a [`ZultiLines`] from its bounding box, offsets and coords.
+    /// If the bounding box doesn't properly bound the polygon all the operation will breaks.
     pub fn new(bounding_box: &'a BoundingBox, offsets: &'a [u32], bytes: &'a [u8]) -> Self {
         Self {
             bounding_box,
@@ -63,6 +65,7 @@ impl<'a> ZultiLines<'a> {
         }
     }
 
+    /// Convert the specified [`geo_types::MultiLineString`] to a valid [`ZultiLines`] slice of bytes in the input buffer.
     pub fn write_from_geometry(
         writer: &mut Vec<u8>,
         geometry: &MultiLineString<f64>,
@@ -102,11 +105,13 @@ impl<'a> ZultiLines<'a> {
         Ok(())
     }
 
+    /// Return the internal bounding box
     #[inline]
     pub fn bounding_box(&self) -> &'a BoundingBox {
         self.bounding_box
     }
 
+    /// Return a line by index, if the index doesn't exists, returns None
     #[inline]
     pub fn get(&self, index: usize) -> Option<Zine<'a>> {
         let offset = *self.offsets.get(index)?;
@@ -118,21 +123,25 @@ impl<'a> ZultiLines<'a> {
         Some(unsafe { Zine::from_bytes(bytes) })
     }
 
+    /// Return the number of lines contained in the multi-line
     #[inline]
     pub fn len(&self) -> usize {
         self.offsets.len()
     }
 
+    /// Return `true` if the multi polygons doesn't contain any polygons
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Returns the individual [`Zine`]s that compose the [`ZultiLines`]
     #[inline]
     pub fn lines(&'a self) -> impl Iterator<Item = Zine<'a>> {
         (0..self.len()).map(move |index| self.get(index).unwrap())
     }
 
+    /// Convert the [`ZultiLines`] back to a [`geo_types::MultiLines`].
     pub fn to_geo(&self) -> geo_types::MultiLineString<f64> {
         geo_types::MultiLineString::new(self.lines().map(|zine| zine.to_geo()).collect())
     }

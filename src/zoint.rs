@@ -15,6 +15,8 @@ pub struct Zoint<'a> {
 }
 
 impl<'a> Zoint<'a> {
+    /// Create a [`Zine`] from its bounding box and coords.
+    /// If the bounding box doesn't properly bound the polygon all the operation will breaks.
     pub fn new(coord: &'a Coord) -> Self {
         Self { coord }
     }
@@ -27,6 +29,7 @@ impl<'a> Zoint<'a> {
         Self::new(coord)
     }
 
+    /// Convert the specified [`geo_types::Point`] to a valid [`Zoint`] slice of bytes in the input buffer.
     pub fn write_from_geometry(
         writer: &mut impl Write,
         geometry: &Point<f64>,
@@ -37,28 +40,33 @@ impl<'a> Zoint<'a> {
     }
 
     #[inline]
-    pub fn coord(&self) -> &'a Coord {
+    pub(crate) fn coord(&self) -> &'a Coord {
         self.coord
     }
 
+    /// Return the latitude.
     #[inline]
     pub fn lat(&self) -> f64 {
         self.coord.lat()
     }
+    /// Return the longitude.
     #[inline]
     pub fn lng(&self) -> f64 {
         self.coord.lng()
     }
 
+    /// Return the x.
     #[inline]
     pub fn x(&self) -> f64 {
         self.coord.lng()
     }
+    /// Return the y.
     #[inline]
     pub fn y(&self) -> f64 {
         self.coord.lat()
     }
 
+    /// Convert the [`Zoint`] back to a [`geo_types::Point`].
     #[inline]
     pub fn to_geo(&self) -> geo_types::Point<f64> {
         geo_types::Point::new(self.coord.lng(), self.coord.lat())

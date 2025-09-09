@@ -1,4 +1,5 @@
 #![doc = include_str!("../README.md")]
+#![warn(missing_docs)]
 
 mod bounding_box;
 mod coord;
@@ -36,12 +37,19 @@ pub use zulti_polygons::ZultiPolygons;
 /// Main structure of this crate, this is the equivalent of a [`geo_types::Geometry`] but serialized.
 #[derive(Debug, Clone, Copy)]
 pub enum Zerometry<'a> {
+    /// Equivalent of a [`geo_types::Point`]
     Point(Zoint<'a>),
+    /// Equivalent of a [`geo_types::MultiPoint`]
     MultiPoints(ZultiPoints<'a>),
+    /// Equivalent of a [`geo_types::LineString`]
     Line(Zine<'a>),
+    /// Equivalent of a [`geo_types::MultiLineString`]
     MultiLines(ZultiLines<'a>),
+    /// Equivalent of a [`geo_types::Polygon`]
     Polygon(Zolygon<'a>),
+    /// Equivalent of a [`geo_types::MultiPolygon`]
     MultiPolygon(ZultiPolygons<'a>),
+    /// Equivalent of a [`geo_types::GeometryCollection`]
     Collection(Zollection<'a>),
 }
 
@@ -146,6 +154,7 @@ impl<'a> Zerometry<'a> {
         Ok(())
     }
 
+    /// Convert the [`Zerometry`] to a [`Zoint`] if possible. If it was not a point it returns [`None`].
     #[inline]
     pub fn to_point(&self) -> Option<Zoint> {
         match self {
@@ -154,6 +163,7 @@ impl<'a> Zerometry<'a> {
         }
     }
 
+    /// Convert the [`Zerometry`] to a [`ZultiPoints`] if possible. If it was not a multi point it returns [`None`].
     #[inline]
     pub fn to_multi_points(&self) -> Option<ZultiPoints> {
         match self {
@@ -162,6 +172,7 @@ impl<'a> Zerometry<'a> {
         }
     }
 
+    /// Convert the [`Zerometry`] to a [`Zine`] if possible. If it was not a line it returns [`None`].
     #[inline]
     pub fn to_line(&self) -> Option<Zine> {
         match self {
@@ -170,6 +181,7 @@ impl<'a> Zerometry<'a> {
         }
     }
 
+    /// Convert the [`Zerometry`] to a [`ZultiLines`] if possible. If it was not a multi lines it returns [`None`].
     #[inline]
     pub fn to_zulti_lines(&self) -> Option<ZultiLines> {
         match self {
@@ -178,6 +190,7 @@ impl<'a> Zerometry<'a> {
         }
     }
 
+    /// Convert the [`Zerometry`] to a [`Zolygon`] if possible. If it was not a polygon it returns [`None`].
     #[inline]
     pub fn to_polygon(&self) -> Option<Zolygon> {
         match self {
@@ -186,6 +199,7 @@ impl<'a> Zerometry<'a> {
         }
     }
 
+    /// Convert the [`Zerometry`] to a [`ZultiPolygons`] if possible. If it was not a multi polygons it returns [`None`].
     #[inline]
     pub fn to_multi_polygon(&self) -> Option<ZultiPolygons> {
         match self {
@@ -194,6 +208,18 @@ impl<'a> Zerometry<'a> {
         }
     }
 
+    /// Convert the [`Zerometry`] to a [`Zollection`] if possible. If it was not a collection it returns [`None`].
+    #[inline]
+    pub fn to_collection(&self) -> Option<Zollection> {
+        match self {
+            Zerometry::Collection(a) => Some(*a),
+            _ => None,
+        }
+    }
+
+    /// Convert the [`Zerometry`] back to a [`geo_types::Geometry`].
+    /// Don't forget that converting the geometry to a zerometry was a destructive operation.
+    /// This means the geometry you'll get back won't necessarily correspond to your initial geometry.
     pub fn to_geo(&self) -> geo_types::Geometry<f64> {
         match self {
             Zerometry::Point(a) => Geometry::Point(a.to_geo()),

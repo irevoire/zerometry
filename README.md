@@ -37,7 +37,7 @@ let mut buffer = Vec::new();
 // Serialize the point to the zerometry format in the buffer
 Zoint::write_from_geometry(&mut buffer, &point).unwrap();
 // Make a zoint out of the buffer
-let zoint = Zoint::from_bytes(&buffer);
+let zoint = unsafe { Zoint::from_bytes(&buffer) };
 assert_eq!(zoint.x(), 12.0);
 assert_eq!(zoint.y(), 13.0);
 ```
@@ -55,16 +55,17 @@ calling it.
 
 ```rust
 use zerometry::{Zoint, Zolygon, RelationBetweenShapes, InputRelation};
+use geo_types::polygon;
 
 let point = geo_types::Point::new(0.0, 0.0);
-let polygon = geo_types::polygon![(x: -1.0, y: -1.0), (x: 1.0, y: -1.0), (x: 1.0, y: 1.0), (x: -1.0, y: 1.0)];
+let polygon = polygon![(x: -1.0, y: -1.0), (x: 1.0, y: -1.0), (x: 1.0, y: 1.0), (x: -1.0, y: 1.0)];
 
 let mut buffer = Vec::new();
 Zoint::write_from_geometry(&mut buffer, &point).unwrap();
-let zoint = Zoint::from_bytes(&buffer);
+let zoint = unsafe { Zoint::from_bytes(&buffer) };
 let mut buffer = Vec::new();
-Zoint::write_from_geometry(&mut buffer, &polygon).unwrap();
-let zolygon = Zolygon::from_bytes(&buffer);
+Zolygon::write_from_geometry(&mut buffer, &polygon).unwrap();
+let zolygon = unsafe { Zolygon::from_bytes(&buffer) };
 
 // Let's say we just want to know if the point is contained in the polygon,
 // we could write

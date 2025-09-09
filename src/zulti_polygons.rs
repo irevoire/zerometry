@@ -21,6 +21,7 @@ pub struct ZultiPolygons<'a> {
 }
 
 impl<'a> ZultiPolygons<'a> {
+    /// Create a [`ZultiPolygons`] from its bounding box, coords offsets and bytes.
     pub fn new(bounding_box: &'a BoundingBox, offsets: &'a [u32], bytes: &'a [u8]) -> Self {
         Self {
             bounding_box,
@@ -63,6 +64,8 @@ impl<'a> ZultiPolygons<'a> {
         }
     }
 
+    /// Convert the specified [`geo_types::MultiPolygon`] to a valid [`ZultiPolygons`] slice of bytes in the input buffer.
+    /// If the polygon contains an interior, the information will be lost and ignored during operations.
     pub fn write_from_geometry(
         writer: &mut Vec<u8>,
         geometry: &MultiPolygon<f64>,
@@ -101,11 +104,13 @@ impl<'a> ZultiPolygons<'a> {
         Ok(())
     }
 
+    /// Return the bounding box containing all polygons
     #[inline]
     pub fn bounding_box(&self) -> &'a BoundingBox {
         self.bounding_box
     }
 
+    /// Return a polygon by index, if the index doesn't exists, returns None
     #[inline]
     pub fn get(&self, index: usize) -> Option<Zolygon<'a>> {
         let offset = *self.offsets.get(index)?;
@@ -117,21 +122,25 @@ impl<'a> ZultiPolygons<'a> {
         Some(unsafe { Zolygon::from_bytes(bytes) })
     }
 
+    /// Return the number of polygons contained in the multi-polygon
     #[inline]
     pub fn len(&self) -> usize {
         self.offsets.len()
     }
 
+    /// Return `true` if the multi polygons doesn't contain any polygons
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Returns the individual [`Zolygon`]s that compose the [`ZultiPolygons`]
     #[inline]
     pub fn polygons(&'a self) -> impl Iterator<Item = Zolygon<'a>> {
         (0..self.len()).map(move |index| self.get(index).unwrap())
     }
 
+    /// Convert the [`ZultiPolygons`] back to a [`geo_types::MultiPolygon`].
     pub fn to_geo(&self) -> geo_types::MultiPolygon<f64> {
         geo_types::MultiPolygon::new(self.polygons().map(|zolygon| zolygon.to_geo()).collect())
     }

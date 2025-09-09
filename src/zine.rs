@@ -17,6 +17,8 @@ pub struct Zine<'a> {
 }
 
 impl<'a> Zine<'a> {
+    /// Create a [`Zine`] from its bounding box and coords.
+    /// If the bounding box doesn't properly bound the polygon all the operation will breaks.
     pub fn new(bounding_box: &'a BoundingBox, coords: &'a Coords) -> Self {
         Self {
             bounding_box,
@@ -33,6 +35,7 @@ impl<'a> Zine<'a> {
         Self::new(bounding_box, coords)
     }
 
+    /// Convert the specified [`geo_types::LineString`] to a valid [`Zine`] slice of bytes in the input buffer.
     pub fn write_from_geometry(
         writer: &mut impl Write,
         geometry: &LineString<f64>,
@@ -48,31 +51,40 @@ impl<'a> Zine<'a> {
         Ok(())
     }
 
+    /// Return the internal bounding box
     #[inline]
     pub fn bounding_box(&self) -> &'a BoundingBox {
         self.bounding_box
     }
 
+    /// Return the number of points composing the line
     #[inline]
     pub fn len(&self) -> usize {
         self.coords.len()
     }
 
+    /// Return true if the line don't contain any point
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Return the internal coords
     #[inline]
     pub fn coords(&self) -> &'a Coords {
         self.coords
     }
 
+    /// Return the segments that composes the line
     #[inline]
     pub fn segments(&self) -> impl Iterator<Item = Segment<'a>> {
-        self.coords.consecutive_pairs().map(Segment::from_slice)
+        self.coords
+            .consecutive_pairs()
+            // SAFETY: The pairs returned by coords are aligned and contains only two points
+            .map(|coords| unsafe { Segment::from_slice(coords) })
     }
 
+    /// Convert the [`Zine`] back to a [`geo_types::LineString`].
     pub fn to_geo(self) -> geo_types::LineString<f64> {
         geo_types::LineString::new(
             self.coords

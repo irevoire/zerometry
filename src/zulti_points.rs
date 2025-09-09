@@ -16,6 +16,7 @@ pub struct ZultiPoints<'a> {
 }
 
 impl<'a> ZultiPoints<'a> {
+    /// Create a [`ZultiPoints`] from its bounding box and coords.
     pub fn new(bounding_box: &'a BoundingBox, coords: &'a Coords) -> Self {
         Self {
             bounding_box,
@@ -32,6 +33,7 @@ impl<'a> ZultiPoints<'a> {
         Self::new(bounding_box, coords)
     }
 
+    /// Convert the specified [`geo_types::MultiPoint`] to a valid [`ZultiPoints`] slice of bytes in the input buffer.
     pub fn write_from_geometry(
         writer: &mut impl Write,
         geometry: &MultiPoint<f64>,
@@ -44,26 +46,30 @@ impl<'a> ZultiPoints<'a> {
         Ok(())
     }
 
+    /// Return the bounding box containing all polygons
     #[inline]
     pub fn bounding_box(&self) -> &'a BoundingBox {
         self.bounding_box
     }
 
+    /// Return the number of point contained in the multi-point
     #[inline]
     pub fn len(&self) -> usize {
         self.coords.len()
     }
 
+    /// Return `true` if the multi points doesn't contain any point
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     #[inline]
-    pub fn coords(&self) -> &'a Coords {
+    pub(crate) fn coords(&self) -> &'a Coords {
         self.coords
     }
 
+    /// Convert the [`ZultiPoints`] back to a [`geo_types::MultiPoint`].
     pub fn to_geo(&self) -> geo_types::MultiPoint<f64> {
         geo_types::MultiPoint::new(
             self.coords

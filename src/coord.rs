@@ -3,6 +3,7 @@ use core::fmt;
 pub(crate) const COORD_SIZE_IN_BYTES: usize = std::mem::size_of::<f64>() * 2;
 pub(crate) const COORD_SIZE_IN_FLOATS: usize = 2;
 
+/// Represent a coordinate. The first float is the longitude, or x, and the second is the latitude, or y.
 #[repr(transparent)]
 pub struct Coord {
     data: [f64],
@@ -10,7 +11,7 @@ pub struct Coord {
 
 impl<'a> Coord {
     /// # Safety
-    /// The data must be aligned on 64 bits and contain an even number of f64.
+    /// The data must be aligned on 64 bits and contain an two number of f64.
     pub unsafe fn from_bytes(data: &'a [u8]) -> &'a Self {
         debug_assert_eq!(
             data.len(),
@@ -25,40 +26,52 @@ impl<'a> Coord {
         unsafe { std::mem::transmute(data) }
     }
 
-    pub fn from_slice(data: &[f64]) -> &Self {
+    /// # Safety
+    /// The data must contain two f64.
+    pub unsafe fn from_slice(data: &[f64]) -> &Self {
+        debug_assert_eq!(data.len(), 2);
+        // SAFETY: Rust guarantee that the f64 slice is already aligned on 64 bits
+        unsafe { std::mem::transmute(data) }
+    }
+
+    /// # Safety
+    /// The data must be aligned on 64 bits and contain an even number of f64.
+    pub unsafe fn from_slice_mut(data: &mut [f64]) -> &mut Self {
         debug_assert_eq!(data.len(), 2);
         unsafe { std::mem::transmute(data) }
     }
 
-    pub fn from_slice_mut(data: &mut [f64]) -> &mut Self {
-        debug_assert_eq!(data.len(), 2);
-        unsafe { std::mem::transmute(data) }
-    }
-
+    /// Return the longitude
     pub fn lng(&self) -> f64 {
         self.data[0]
     }
 
+    /// Return a mutable ref to the longitude
     pub fn lng_mut(&mut self) -> &mut f64 {
         &mut self.data[0]
     }
 
+    /// Return the latitude
     pub fn lat(&self) -> f64 {
         self.data[1]
     }
 
+    /// Return a mutable ref to the latitude
     pub fn lat_mut(&mut self) -> &mut f64 {
         &mut self.data[1]
     }
 
+    /// Return `x`
     pub fn x(&self) -> f64 {
         self.lng()
     }
 
+    /// Return `y`
     pub fn y(&self) -> f64 {
         self.lat()
     }
 
+    /// Convert the [`Coord`] to a [`geo_types::Coord`]
     pub fn to_geo(&self) -> geo_types::Coord<f64> {
         geo_types::Coord {
             x: self.lng(),

@@ -33,6 +33,8 @@ pub struct Zollection<'a> {
 }
 
 impl<'a> Zollection<'a> {
+    /// Create a [`Zollection`] from its bounding box, points, lines and polygons.
+    /// If the bounding box doesn't properly bound the collection all the operations will breaks.
     pub fn new(
         bounding_box: &'a BoundingBox,
         points: ZultiPoints<'a>,
@@ -82,6 +84,10 @@ impl<'a> Zollection<'a> {
         }
     }
 
+    /// Convert the specified [`geo_types::GeometryCollection`] to a valid [`Zollection`] slice of bytes in the input buffer.
+    /// This is a destructive operation:
+    /// - The collection will be flattened as a list of points, lines and polygons
+    /// - If the polygons contains an interior, the information will be lost and ignored during operations.
     pub fn write_from_geometry(
         writer: &mut Vec<u8>,
         geometry: &GeometryCollection<f64>,
@@ -132,31 +138,37 @@ impl<'a> Zollection<'a> {
         Ok(())
     }
 
+    /// Return the internal bounding box
     #[inline]
     pub fn bounding_box(&self) -> &'a BoundingBox {
         self.bounding_box
     }
 
+    /// Return the number of shapes composing the collection
     #[inline]
     pub fn len(&self) -> usize {
         self.points.len() + self.lines.len() + self.polygons.len()
     }
 
+    /// Return true if the line don't contain any point
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Return all the points contained in the collection
     #[inline]
     pub fn points(&'a self) -> ZultiPoints<'a> {
         self.points
     }
 
+    /// Return all the lines contained in the collection
     #[inline]
     pub fn lines(&'a self) -> ZultiLines<'a> {
         self.lines
     }
 
+    /// Return all the polygons contained in the collection
     #[inline]
     pub fn polygons(&'a self) -> ZultiPolygons<'a> {
         self.polygons

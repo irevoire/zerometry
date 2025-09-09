@@ -2,23 +2,27 @@ use std::ops;
 
 /// This struct is used to query the specific relationship between two shapes.
 /// By default nothing is enabled and no relation are computed.
+///
+/// The difference between the strict and normal version of contains and contained are when dealing with multi-shape.
+/// Contains would return true if only one point of a multi-poins is contained in the first shape.
+/// The strict contains only returns true if all the points of the multi-points are contained in the
+/// first shape. It's also way more expensive to compute.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct InputRelation {
     /// Return true if any part on the first shape contains any part of the second shape.
     pub contains: bool,
     /// Return true if any parts of the first shape contains all parts of the second shape.
-    /// The difference between the strict and lose contains are when dealing with multi-shape.
-    /// Contains would return true if only one point of a multi-poins is contained in the first shape.
-    /// The strict contains only returns true if all the points of the multi-points are contained in the
-    /// first shape. It's also way more expensive to compute.
     pub strict_contains: bool,
 
-    /// Return true if any part on the first shape is contained in any part of the second shape.
+    /// Return true if any part of the first shape is contained in any part of the second shape.
     pub contained: bool,
+    /// Return true if all parts of the first shape are contained in any part of the second shape.
     pub strict_contained: bool,
 
+    /// Return true if all parts of the first shape are contained in any part of the second shape.
     pub intersect: bool,
 
+    /// Return true if there is no relation between both shapes.
     pub disjoint: bool,
 
     /// If set to `true` the relation algorithm will stop as soon as possible after filling any value.
@@ -108,16 +112,22 @@ impl InputRelation {
 /// though they were not evaluated at all.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct OutputRelation {
+    /// Return true if any part on the first shape contains any part of the second shape.
     pub contains: Option<bool>,
+    /// Return true if any parts of the first shape contains all parts of the second shape.
     pub strict_contains: Option<bool>,
+    /// Return true if any part of the first shape is contained in any part of the second shape.
     pub contained: Option<bool>,
+    /// Return true if all parts of the first shape are contained in any part of the second shape.
     pub strict_contained: Option<bool>,
+    /// Return true if all parts of the first shape are contained in any part of the second shape.
     pub intersect: Option<bool>,
+    /// Return true if there is no relation between both shapes.
     pub disjoint: Option<bool>,
 }
 
 impl OutputRelation {
-    pub fn false_from_input(relation: InputRelation) -> Self {
+    pub(crate) fn false_from_input(relation: InputRelation) -> Self {
         Self {
             contains: relation.contains.then_some(false),
             strict_contains: relation.strict_contains.then_some(false),
@@ -128,7 +138,7 @@ impl OutputRelation {
         }
     }
 
-    pub fn true_from_input(relation: InputRelation) -> Self {
+    pub(crate) fn true_from_input(relation: InputRelation) -> Self {
         Self {
             contains: relation.contains.then_some(true),
             strict_contains: relation.strict_contains.then_some(true),
@@ -139,86 +149,42 @@ impl OutputRelation {
         }
     }
 
-    pub fn make_contains_if_set(mut self) -> Self {
+    pub(crate) fn make_contains_if_set(mut self) -> Self {
         self.contains = self.contains.map(|_| true);
         self
     }
 
     /// Set both the contains and strict_contains field to true if they are set
-    pub fn make_strict_contains_if_set(mut self) -> Self {
+    pub(crate) fn make_strict_contains_if_set(mut self) -> Self {
         self.strict_contains = self.strict_contains.map(|_| true);
         self.make_contains_if_set()
     }
 
-    pub fn make_contained_if_set(mut self) -> Self {
+    pub(crate) fn make_contained_if_set(mut self) -> Self {
         self.contained = self.contained.map(|_| true);
         self
     }
 
     /// Set both the contained and strict_contained field to true if they are set
-    pub fn make_strict_contained_if_set(mut self) -> Self {
+    pub(crate) fn make_strict_contained_if_set(mut self) -> Self {
         self.strict_contained = self.strict_contained.map(|_| true);
         self.make_contained_if_set()
     }
 
-    pub fn make_intersect_if_set(mut self) -> Self {
+    pub(crate) fn make_intersect_if_set(mut self) -> Self {
         self.intersect = self.intersect.map(|_| true);
         self
     }
 
-    pub fn make_disjoint_if_set(mut self) -> Self {
+    pub(crate) fn make_disjoint_if_set(mut self) -> Self {
         self.disjoint = self.disjoint.map(|_| true);
         self
     }
 
-    pub fn strip_strict(mut self) -> Self {
+    pub(crate) fn strip_strict(mut self) -> Self {
         self.strict_contains = None;
         self.strict_contained = None;
         self
-    }
-
-    pub fn contains() -> Self {
-        Self {
-            contains: Some(true),
-            ..Default::default()
-        }
-    }
-
-    pub fn strict_contains() -> Self {
-        Self {
-            contains: Some(true),
-            strict_contains: Some(true),
-            ..Default::default()
-        }
-    }
-
-    pub fn contained() -> Self {
-        Self {
-            contained: Some(true),
-            ..Default::default()
-        }
-    }
-
-    pub fn strict_contained() -> Self {
-        Self {
-            contained: Some(true),
-            strict_contained: Some(true),
-            ..Default::default()
-        }
-    }
-
-    pub fn intersect() -> Self {
-        Self {
-            intersect: Some(true),
-            ..Default::default()
-        }
-    }
-
-    pub fn disjoint() -> Self {
-        Self {
-            disjoint: Some(true),
-            ..Default::default()
-        }
     }
 
     /// Return true if the output contains anything except disjoint.
@@ -295,17 +261,44 @@ impl ops::BitOrAssign for OutputRelation {
     }
 }
 
+/// Lets you query the relation between two shapes.
 pub trait RelationBetweenShapes<Other: ?Sized> {
+    /// Return the relation between two shapes.
+    /// The [`InputRelation`] lets you specify the kind of relation you want to retrieve.
+    ///
+    // ```
+    /// use zerometry::{Zoint, Zolygon, RelationBetweenShapes, InputRelation};
+    ///
+    /// let point = geo_types::Point::new(0.0, 0.0);
+    /// let polygon = geo_types::polygon![(x: -1.0, y: -1.0), (x: 1.0, y: -1.0), (x: 1.0, y: 1.0), (x: -1.0, y: 1.0)];
+    ///
+    /// let mut buffer = Vec::new();
+    /// Zoint::write_from_geometry(&mut buffer, &point).unwrap();
+    /// let zoint = Zoint::from_bytes(&buffer);
+    /// let mut buffer = Vec::new();
+    /// Zoint::write_from_geometry(&mut buffer, &polygon).unwrap();
+    /// let zolygon = Zolygon::from_bytes(&buffer);
+    ///
+    /// // Let's say we just want to know if the point is contained in the polygon,
+    /// // we could write
+    /// let relation = InputRelation { contains: true, ..InputRelation::default() };
+    /// // The we can ask the relation between our two shape with the `relation` method:
+    /// let relation = zolygon.relation(&zoint, relation);
+    /// assert_eq!(relation.contains, Some(true));
+    /// ```
     fn relation(&self, other: &Other, relation: InputRelation) -> OutputRelation;
 
+    /// Return all relations with no early return.
     fn all_relation(&self, other: &Other) -> OutputRelation {
         self.relation(other, InputRelation::all())
     }
 
+    /// Return the first relation we find with early return.
     fn any_relation(&self, other: &Other) -> OutputRelation {
         self.relation(other, InputRelation::any())
     }
 
+    /// Return `true` if `Self` contains `Other`.
     fn contains(&self, other: &Other) -> bool {
         self.relation(
             other,
@@ -319,6 +312,7 @@ pub trait RelationBetweenShapes<Other: ?Sized> {
         .unwrap_or_default()
     }
 
+    /// Return `true` if `Self` strictly contains `Other`.
     fn strict_contains(&self, other: &Other) -> bool {
         self.relation(
             other,
@@ -332,6 +326,7 @@ pub trait RelationBetweenShapes<Other: ?Sized> {
         .unwrap_or_default()
     }
 
+    /// Return `true` if `Self` is contained in `Other`.
     fn contained(&self, other: &Other) -> bool {
         self.relation(
             other,
@@ -345,6 +340,7 @@ pub trait RelationBetweenShapes<Other: ?Sized> {
         .unwrap_or_default()
     }
 
+    /// Return `true` if `Self` is strictly contained in `Other`.
     fn strict_contained(&self, other: &Other) -> bool {
         self.relation(
             other,
@@ -358,6 +354,7 @@ pub trait RelationBetweenShapes<Other: ?Sized> {
         .unwrap_or_default()
     }
 
+    /// Return `true` if `Self` intersects with `Other`.
     fn intersects(&self, other: &Other) -> bool {
         self.relation(
             other,
@@ -371,6 +368,7 @@ pub trait RelationBetweenShapes<Other: ?Sized> {
         .unwrap_or_default()
     }
 
+    /// Return `true` if `Self` is disjoint of `Other`.
     fn disjoint(&self, other: &Other) -> bool {
         self.relation(
             other,
