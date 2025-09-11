@@ -189,39 +189,40 @@ impl<'a> Zollection<'a> {
 }
 
 fn flatten_geometry_collection(
-    collections: &GeometryCollection,
+    collection: &GeometryCollection,
 ) -> (MultiPoint, MultiLineString, MultiPolygon) {
     let mut points = MultiPoint::new(vec![]);
     let mut lines = MultiLineString::new(vec![]);
     let mut polygons = MultiPolygon::new(vec![]);
 
-    for geometry in collections {
-        match geometry {
-            geo::Geometry::Point(point) => points.0.push(*point),
-            geo::Geometry::MultiPoint(multi_point) => {
-                points.0.extend_from_slice(&multi_point.0);
-            }
-            geo::Geometry::LineString(line_string) => lines.0.push(line_string.clone()),
-            geo::Geometry::MultiLineString(multi_line_string) => {
-                lines.0.extend_from_slice(&multi_line_string.0);
-            }
-            geo::Geometry::Polygon(polygon) => polygons.0.push(polygon.clone()),
-            geo::Geometry::MultiPolygon(multi_polygon) => {
-                polygons.0.extend_from_slice(&multi_polygon.0);
-            }
+    let mut to_flatten = vec![collection];
 
-            geo::Geometry::GeometryCollection(geometry_collection) => {
-                let (mut pt, mut l, mut pg) = flatten_geometry_collection(geometry_collection);
-                points.0.append(&mut pt.0);
-                lines.0.append(&mut l.0);
-                polygons.0.append(&mut pg.0);
-            }
+    while let Some(collection) = to_flatten.pop() {
+        for geometry in collection {
+            match geometry {
+                geo::Geometry::Point(point) => points.0.push(*point),
+                geo::Geometry::MultiPoint(multi_point) => {
+                    points.0.extend_from_slice(&multi_point.0);
+                }
+                geo::Geometry::LineString(line_string) => lines.0.push(line_string.clone()),
+                geo::Geometry::MultiLineString(multi_line_string) => {
+                    lines.0.extend_from_slice(&multi_line_string.0);
+                }
+                geo::Geometry::Polygon(polygon) => polygons.0.push(polygon.clone()),
+                geo::Geometry::MultiPolygon(multi_polygon) => {
+                    polygons.0.extend_from_slice(&multi_polygon.0);
+                }
 
-            // The following should never happens in the context of meilisearch since we
-            // only handle geojson and they're not valid types
-            geo::Geometry::Line(line) => lines.0.push(line.into()),
-            geo::Geometry::Rect(rect) => polygons.0.push(rect.to_polygon()),
-            geo::Geometry::Triangle(triangle) => polygons.0.push(triangle.to_polygon()),
+                geo::Geometry::GeometryCollection(geometry_collection) => {
+                    to_flatten.push(geometry_collection);
+                }
+
+                // The following should never happens in the context of meilisearch since we
+                // only handle geojson and they're not valid types
+                geo::Geometry::Line(line) => lines.0.push(line.into()),
+                geo::Geometry::Rect(rect) => polygons.0.push(rect.to_polygon()),
+                geo::Geometry::Triangle(triangle) => polygons.0.push(triangle.to_polygon()),
+            }
         }
     }
 
@@ -843,12 +844,12 @@ mod tests {
                 },
                 points: [
                     Zoint {
-                        lng: 1.0,
-                        lat: 2.0,
-                    },
-                    Zoint {
                         lng: 3.0,
                         lat: 4.0,
+                    },
+                    Zoint {
+                        lng: 1.0,
+                        lat: 2.0,
                     },
                 ],
             },
