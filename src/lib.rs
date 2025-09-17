@@ -156,7 +156,7 @@ impl<'a> Zerometry<'a> {
 
     /// Convert the [`Zerometry`] to a [`Zoint`] if possible. If it was not a point it returns [`None`].
     #[inline]
-    pub fn to_point(&self) -> Option<Zoint> {
+    pub fn to_point(&self) -> Option<Zoint<'_>> {
         match self {
             Zerometry::Point(a) => Some(*a),
             _ => None,
@@ -165,7 +165,7 @@ impl<'a> Zerometry<'a> {
 
     /// Convert the [`Zerometry`] to a [`ZultiPoints`] if possible. If it was not a multi point it returns [`None`].
     #[inline]
-    pub fn to_multi_points(&self) -> Option<ZultiPoints> {
+    pub fn to_multi_points(&self) -> Option<ZultiPoints<'_>> {
         match self {
             Zerometry::MultiPoints(a) => Some(*a),
             _ => None,
@@ -174,7 +174,7 @@ impl<'a> Zerometry<'a> {
 
     /// Convert the [`Zerometry`] to a [`Zine`] if possible. If it was not a line it returns [`None`].
     #[inline]
-    pub fn to_line(&self) -> Option<Zine> {
+    pub fn to_line(&self) -> Option<Zine<'_>> {
         match self {
             Zerometry::Line(a) => Some(*a),
             _ => None,
@@ -183,7 +183,7 @@ impl<'a> Zerometry<'a> {
 
     /// Convert the [`Zerometry`] to a [`ZultiLines`] if possible. If it was not a multi lines it returns [`None`].
     #[inline]
-    pub fn to_zulti_lines(&self) -> Option<ZultiLines> {
+    pub fn to_zulti_lines(&self) -> Option<ZultiLines<'_>> {
         match self {
             Zerometry::MultiLines(a) => Some(*a),
             _ => None,
@@ -192,7 +192,7 @@ impl<'a> Zerometry<'a> {
 
     /// Convert the [`Zerometry`] to a [`Zolygon`] if possible. If it was not a polygon it returns [`None`].
     #[inline]
-    pub fn to_polygon(&self) -> Option<Zolygon> {
+    pub fn to_polygon(&self) -> Option<Zolygon<'_>> {
         match self {
             Zerometry::Polygon(a) => Some(*a),
             _ => None,
@@ -201,7 +201,7 @@ impl<'a> Zerometry<'a> {
 
     /// Convert the [`Zerometry`] to a [`ZultiPolygons`] if possible. If it was not a multi polygons it returns [`None`].
     #[inline]
-    pub fn to_multi_polygon(&self) -> Option<ZultiPolygons> {
+    pub fn to_multi_polygon(&self) -> Option<ZultiPolygons<'_>> {
         match self {
             Zerometry::MultiPolygon(a) => Some(*a),
             _ => None,
@@ -210,7 +210,7 @@ impl<'a> Zerometry<'a> {
 
     /// Convert the [`Zerometry`] to a [`Zollection`] if possible. If it was not a collection it returns [`None`].
     #[inline]
-    pub fn to_collection(&self) -> Option<Zollection> {
+    pub fn to_collection(&self) -> Option<Zollection<'_>> {
         match self {
             Zerometry::Collection(a) => Some(*a),
             _ => None,
